@@ -1,0 +1,13 @@
+[Unit]
+Description=mediatorserver
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/snmp/
+SyslogIdentifier=MediatorServer
+ExecStart=/opt/snmp/bin/mediatorserver.sh
+User=mediators
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
