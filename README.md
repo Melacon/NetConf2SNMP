@@ -1,6 +1,6 @@
 ### Description
 
-This project is to integrate SNMP devices into the OpenDayLight project. Therefore every SNMP device will be represented with one mediator-instance. On one server there can run multiple instances of this mediator. To control the whole server and the mediator instances there will be an HTTP-API which will be used by the ODL GUI.
+This project is to integrate SNMP devices into the OpenDayLight project. Therefore every SNMP device will be represented with one mediator-instance. On one server there can run multiple instances of this mediator. To control the whole server and the mediator instances there will be an HTTP-API which could be accessed by the ODL GUI.
  
 SubProjects:
 
@@ -60,4 +60,7 @@ TODO
 
 
 ```
+
+
+### License
 

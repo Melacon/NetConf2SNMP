@@ -28,8 +28,28 @@ ncrangemax=6000
 snmprangemin=10000
 snmprangemax=12000
 
-#Log
+#PortRange for JMX
+jmxrangemin=6001
+jmxrangemax=7000
+
+#Log (ERROR | WARN | DEBUG | INFO | TRACE )
+loglevel=WARN
 logfile=/var/log/mediatorserver.log
+
+#=====================================
+#global MediatorConfig
+
+#set LogLevel (ERROR | WARN | DEBUG | INFO | TRACE )
+MediatorLogLevel=DEBUG
+
+#set ping timeout in milliseconds
+MediatorDevicePingTimeout=2000
+
+#set latency for snmp requests
+MediatorSnmpLatency=2000
+
+#set java memory for mediator instance
+MediatorMemory="-Xmx256m -Xms128m"
 
 ```
 * HostIP... is the IPAddress of the mediator server which is used to register the mediators on the OpenDaylight-Server
