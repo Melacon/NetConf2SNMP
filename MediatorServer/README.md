@@ -117,9 +117,7 @@ MediatorDeviceTypes:
 | Value | enumValue | Name |
 | --- | --- | --- |
 | 0 | DEVICETYPE_SIMULATOR | "Simulator" |
-| 1 | DEVICETYPE_DW_HORIZON_COMPACT_PLUS | "DragonWave Compact Plus" |
-| 2 | DEVICETYPE_DW_HORIZON_QUANTUM | "DragonWave Quantum" |
-| 3 | DEVICETYPE_ELVA_1 | "ELVA-1" |
+| 1 | DEVICETYPE_EXAMPLE_DEVICE | "Example Device" |
 
 
 MediatorConfig class:
@@ -142,6 +140,5 @@ MediatorConfig class:
 
 ### TODO
 
-* include Log4J or sth like this
 * read mediators logs
 * implement getperformance task
