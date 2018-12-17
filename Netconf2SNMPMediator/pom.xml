@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.technologies.highstreet</groupId>
 	<artifactId>netconf2snmpmediator</artifactId>
-	<version>0.9.16</version>
+	<version>1.0.0</version>
 	<name>Netconf2SNMPMediator</name>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

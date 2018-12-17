@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.technologies.highstreet</groupId>
     <artifactId>netconf2snmpproject</artifactId>
-    <version>0.1.0</version>
+    <version>1.0.0</version>
     <packaging>pom</packaging>
     <name>Netconf2SNMPProject</name>
     <properties>
