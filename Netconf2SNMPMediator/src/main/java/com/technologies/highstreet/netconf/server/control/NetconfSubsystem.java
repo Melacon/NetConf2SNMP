@@ -13,15 +13,16 @@ import java.io.OutputStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.sshd.server.Command;
+import org.apache.sshd.server.command.Command;
 import org.apache.sshd.server.Environment;
 import org.apache.sshd.server.ExitCallback;
 import org.apache.sshd.server.SessionAware;
 import org.apache.sshd.server.session.ServerSession;
+
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.Console;
+import com.technologies.highstreet.mediatorlib.netconf.server.networkelement.NetworkElement;
 import com.technologies.highstreet.netconf.server.basetypes.BehaviourContainer;
-import com.technologies.highstreet.netconf.server.basetypes.Console;
 import com.technologies.highstreet.netconf.server.basetypes.MessageStore;
-import com.technologies.highstreet.netconf.server.networkelement.NetworkElement;
 
 public class NetconfSubsystem implements Command, SessionAware {
 
@@ -92,21 +93,15 @@ public class NetconfSubsystem implements Command, SessionAware {
         log.error("Wron Wrong wrong");
 
         netconfProcessor = new NetconfController(in, out, err, callback);
-        /*// initialize Netconf processor
-        if(this.ne instanceof Netconf2SNMPNetworkElement) {
-            netconfProcessor = new Netconf2SNMPController(in,out,err,callback);
-        } else {
-            netconfProcessor = new NetconfController(in, out, err, callback);
-        }*/
-
         log.info("Starting new client thread...");
         netconfProcessor.start(messageStore, ne, console);
-        netconfNotifyExecutor.setNetconfNotifyExecutor(netconfProcessor);
+        netconfNotifyExecutor.addNetconfNotifyExecutor(netconfProcessor);
 
     }
 
     @Override
     public void destroy() {
+    	netconfNotifyExecutor.removeNetconfNotifyExecutor(netconfProcessor);
         netconfProcessor.destroy();
     }
 

@@ -1,0 +1,17 @@
+[{
+	"Name": "simulator",
+	"DeviceType": 0,
+	"DeviceIp": "127.0.0.1",
+	"DevicePort": 161,
+	"TrapPort": 10001,
+	"NeXMLFile": "nemodel/DVM_MWCore12_BasicAir.xml",
+	"NcPort": 40001,
+	"ODLConfig": [{
+		"Protocol":"http",
+		"Trustall":false,
+		"Server": "192.168.178.143",
+		"Port": 8181,
+		"User": "admin",
+		"Password": "admin"
+	}]
+}]

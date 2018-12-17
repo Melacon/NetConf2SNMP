@@ -22,24 +22,25 @@ public class ReverseLineInputStream extends InputStream {
         currentLineStart = file.length();
         currentLineEnd = file.length();
         lastPosInFile = file.length() -1;
-        currentPos = currentLineEnd; 
+        currentPos = currentLineEnd;
 
     }
 
-    private void findPrevLine() throws IOException {
+
+    private boolean findPrevLine() throws IOException {
         if (lastChar == -1) {
             in.seek(lastPosInFile);
             lastChar = in.readByte();
         }
 
-        currentLineEnd = currentLineStart; 
+        currentLineEnd = currentLineStart;
 
         // There are no more lines, since we are at the beginning of the file and no lines.
         if (currentLineEnd == 0) {
             currentLineEnd = -1;
             currentLineStart = -1;
             currentPos = -1;
-            return; 
+            return false;
         }
 
         long filePointer = currentLineStart -1;
@@ -48,28 +49,29 @@ public class ReverseLineInputStream extends InputStream {
             filePointer--;
 
             // we are at start of file so this is the first line in the file.
-            if (filePointer < 0) {  
-                break; 
+            if (filePointer < 0) {
+                break;
             }
 
             in.seek(filePointer);
             int readByte = in.readByte();
 
             // We ignore last LF in file. search back to find the previous LF.
-            if (readByte == 0xA && filePointer != lastPosInFile ) {   
+            if (readByte == 0xA && filePointer != lastPosInFile ) {
                 break;
             }
         }
-        // we want to start at pointer +1 so we are after the LF we found or at 0 the start of the file.   
+        // we want to start at pointer +1 so we are after the LF we found or at 0 the start of the file.
         currentLineStart = filePointer + 1;
         currentPos = currentLineStart;
+        return true;
     }
 
     public int read() throws IOException {
 
         if (currentPos < currentLineEnd ) {
             in.seek(currentPos++);
-            int readByte = in.readByte();            
+            int readByte = in.readByte();
             return readByte;
         } else if (currentPos > lastPosInFile && currentLineStart < currentLineEnd) {
             // last line in file (first returned)

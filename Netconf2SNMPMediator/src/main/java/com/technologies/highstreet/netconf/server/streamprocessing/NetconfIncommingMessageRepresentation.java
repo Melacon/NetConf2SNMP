@@ -9,8 +9,10 @@
 
 package com.technologies.highstreet.netconf.server.streamprocessing;
 
-import com.technologies.highstreet.netconf.server.types.NetconfTagList;
 import java.util.HashMap;
+
+import com.technologies.highstreet.mediatorlib.netconf.server.types.NetconfTagList;
+
 import net.i2cat.netconf.rpc.RPCElement;
 
 
@@ -25,7 +27,12 @@ public class NetconfIncommingMessageRepresentation extends RPCElement {
     private String messageUri = NOTSET;
     private final HashMap<String, String> content = new HashMap<String, String>();
     private final NetconfTagList tags = new NetconfTagList();
+	private static int messageID=0;
 
+    public NetconfIncommingMessageRepresentation()
+    {
+    	this.setMessageId("NetconfIncommingMessageRepresentation"+messageID++);
+    }
 
     public void setXmlSourceMessage(String xmlSourceMessage) {
         this.xmlSourceMessage = xmlSourceMessage;

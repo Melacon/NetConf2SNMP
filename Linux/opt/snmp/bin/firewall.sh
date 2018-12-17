@@ -7,14 +7,18 @@ cd $home
 
 MEDIATORS_HOME="mediators/"
 FWSTATUS_FILE="fwstatus.json"
-FOLDERS=`ls $MEDIATORS_HOME`
+FOLDERS=`ls -a $MEDIATORS_HOME`
 
 #clear all NAT rules
 date
 #foreach mediator execute script file
 for s in $FOLDERS; do
 
-  fn=$MEDIATORS_HOME$s"/"$s".run"
+  s2=$s
+  if [[ "$s2" == .* ]]; then
+    s2=${s2:1}
+  fi
+  fn=$MEDIATORS_HOME$s"/"$s2".run"
   echo -n "checking "$fn" ..."
   if [ -e $fn ]; then
     #run NAT rule for this mediator

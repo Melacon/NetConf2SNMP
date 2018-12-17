@@ -12,6 +12,7 @@
     </properties>
    <modules>
      <module>DevicesLib</module>
+     <module>MediatorLib</module>
      <module>Netconf2SNMPMediator</module>
      <module>MediatorServer</module>
   </modules>

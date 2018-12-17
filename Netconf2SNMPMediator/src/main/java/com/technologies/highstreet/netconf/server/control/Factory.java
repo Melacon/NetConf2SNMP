@@ -3,14 +3,15 @@
  */
 package com.technologies.highstreet.netconf.server.control;
 
-import com.technologies.highstreet.netconf.server.basetypes.BehaviourContainer;
-import com.technologies.highstreet.netconf.server.basetypes.Console;
-import com.technologies.highstreet.netconf.server.basetypes.MessageStore;
-import com.technologies.highstreet.netconf.server.networkelement.NetworkElement;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.sshd.common.NamedFactory;
-import org.apache.sshd.server.Command;
+import org.apache.sshd.server.command.Command;
+
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.Console;
+import com.technologies.highstreet.mediatorlib.netconf.server.networkelement.NetworkElement;
+import com.technologies.highstreet.netconf.server.basetypes.BehaviourContainer;
+import com.technologies.highstreet.netconf.server.basetypes.MessageStore;
 
 /**
  * Netconf Subsystem Factory

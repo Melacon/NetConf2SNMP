@@ -3,8 +3,11 @@ package com.technologies.highstreet.mediatorserver.files;
 import java.io.File;
 import java.io.FileFilter;
 
-
+import com.technologies.highstreet.mediatorserver.data.JSONableCollection;
+import com.technologies.highstreet.mediatorserver.data.MediatorLogEntry;
 import com.technologies.highstreet.mediatorserver.data.StringCollection;
+
+
 
 public class MediatorCoreFiles {
 
@@ -25,6 +28,8 @@ public class MediatorCoreFiles {
 	public static String NEMODELPATHREL(){return "nemodel"+DS;}
 	public static String NEMODELPATH(){return HOME+NEMODELPATHREL();}
 	public static String MEDIATORSPATH(){return HOME+"mediators"+DS;}
+	public static String MEDIATOR_BIN() {return BIN()+"Netconf2SNMPMediator.sh";}
+	public static String MEDIATOR_JAR() {return BIN()+"Netconf2SNMPMediator.jar";}
 
 	public static void SetHome(String dir)
 	{
@@ -55,6 +60,10 @@ public class MediatorCoreFiles {
 			}
 		}
 		return list;
+	}
+	public static JSONableCollection<MediatorLogEntry> GetSupportedDevices() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }

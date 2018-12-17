@@ -2,7 +2,9 @@ package com.technologies.highstreet.mediatorserver.server;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Properties;
 import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.ConsoleAppender;
@@ -15,17 +17,16 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import com.technologies.highstreet.mediatorserver.data.MediatorConfig;
+import com.technologies.highstreet.mediatorserver.data.ServerSideMediatorConfig;
 import com.technologies.highstreet.mediatorserver.files.MediatorCoreFiles;
 
 public class WebAppServer {
 
-	public static final String PROPFILE = "/etc/mediatorserver.conf";
 
 	public static boolean CLIMODE = false;
 
 	private static org.apache.commons.logging.Log LOG = LogFactory.getLog(WebAppServer.class);
-	private static MyProperties properties;
+	private static MediatorServerProperties properties;
 
 	private static void setLog(String filename, Level lvl) {
 		BasicConfigurator.configure();
@@ -56,42 +57,92 @@ public class WebAppServer {
 		// repeat with all other desired appenders
 	}
 
+	public static synchronized String getVersion() {
+		    String version = null;
+		    Class<WebAppServer> cls=WebAppServer.class;
+
+		    // try to load from maven properties first
+		    try {
+		        Properties p = new Properties();
+		         InputStream is = cls.getResourceAsStream("/META-INF/maven/com.technologies.highstreet/mediatorserver/pom.properties");
+		        if (is != null) {
+		            p.load(is);
+		            version = p.getProperty("version", "unknown");
+		        }
+		    } catch (Exception e) {
+		        // ignore
+		    }
+
+		    // fallback to using Java API
+		    if (version == null) {
+		        Package aPackage = cls.getPackage();
+		        if (aPackage != null) {
+		            version = aPackage.getImplementationVersion();
+		            if (version == null) {
+		                version = aPackage.getSpecificationVersion();
+		            }
+		        }
+		    }
+
+		    if (version == null) {
+		        // we could not compute the version so use a blank
+		        version = "";
+		    }
+
+		    return version;
+		//return this.getClass().getPackage().getImplementationVersion();
+	}
+	private static String versionString;
+	public static String getVersionString()
+	{return getVersion();}
 	public static void main(String[] args) {
 
 		int propIdx=0;
 		try {
 			if (args.length > 0)
 			{
+				if(args[0]!=null && args[0].equals("--version"))
+				{
+					System.out.println(getVersion());
+					System.exit(0);
+				}
 				if(args[0]!=null && args[0].equals("--cli"))
 				{
 					CLIMODE=true;propIdx++;
 				}
 			}
+			//start with another properties file
 			if(args.length>propIdx)
-				properties = MyProperties.Instantiate(args[propIdx]);
-			else
-				properties = MyProperties.Instantiate();
+				properties = MediatorServerProperties.Instantiate(args[propIdx]);
+			else	//start with default property file
+				properties = MediatorServerProperties.Instantiate();
 		} catch (IOException e1) {
 			LOG.error("error in config file: " + e1.getMessage());
 			return;
 		}
 
 		setLog(properties.getLogfilename(),properties.getLogLevel());
-		MediatorConfig.SetHostIp(properties.getHostIp());
+		ServerSideMediatorConfig.SetHostIp(properties.getHostIp());
 		MediatorCoreFiles.SetHome(properties.getHome());
 		LOG.info("starting server for host=" + properties.getHostIp() + ":" + properties.getPort() + "...");
 
 		Server server = new Server(properties.getPort());
-		ServletContextHandler handler = new ServletContextHandler(server, "/api");
+		versionString=Server.getVersion();
+		LOG.info("version="+versionString);
+		ServletContextHandler handlerCompat = new ServletContextHandler(server, "/api");
+		ServletContextHandler handlerV1 = new ServletContextHandler(server, "/v1");
+		ServletContextHandler handlerV2 = new ServletContextHandler(server, "/v2");
 
-		handler.addServlet(TaskServlet.class, "/");
+		handlerCompat.addServlet(TaskServlet.class, "/");
+		handlerV1.addServlet(TaskServlet.class, "/api/");
+		handlerV2.addServlet(TaskServletv2.class, "/api/");
 
 		ResourceHandler resource_handler = new ResourceHandler();
 		resource_handler.setDirectoriesListed(true);
 		resource_handler.setWelcomeFiles(new String[] { "index.html" });
 		resource_handler.setResourceBase("www/");
 		HandlerList handlers = new HandlerList();
-		handlers.setHandlers(new Handler[] { resource_handler, handler });
+		handlers.setHandlers(new Handler[] { resource_handler, handlerCompat,handlerV1,handlerV2 });
 		server.setHandler(handlers);
 		server.setStopTimeout(3000);
 		try {

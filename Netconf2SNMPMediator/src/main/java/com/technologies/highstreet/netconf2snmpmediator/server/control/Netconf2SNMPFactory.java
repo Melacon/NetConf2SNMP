@@ -3,24 +3,22 @@
  */
 package com.technologies.highstreet.netconf2snmpmediator.server.control;
 
+import org.apache.sshd.common.NamedFactory;
+import org.apache.sshd.server.command.Command;
+
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.Console;
 import com.technologies.highstreet.netconf.server.basetypes.BehaviourContainer;
-import com.technologies.highstreet.netconf.server.basetypes.Console;
 import com.technologies.highstreet.netconf.server.basetypes.MessageStore;
 import com.technologies.highstreet.netconf.server.control.NetconfNotifyOriginator;
 import com.technologies.highstreet.netconf2snmpmediator.server.networkelement.Netconf2SNMPNetworkElement;
 import com.technologies.highstreet.netconf2snmpmediator.server.streamProcessing.MediatorConnectionListener;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.sshd.common.NamedFactory;
-import org.apache.sshd.server.Command;
 
 /**
  * @author herbert
  *
  */
 public class Netconf2SNMPFactory implements NamedFactory<Command> {
-    private static final Log log2  = LogFactory.getLog(Netconf2SNMPFactory.class);
+   // private static final Log log2  = LogFactory.getLog(Netconf2SNMPFactory.class);
 
     private MessageStore        messageStore        = null;
     private BehaviourContainer  behaviourContainer    = null;
@@ -28,7 +26,7 @@ public class Netconf2SNMPFactory implements NamedFactory<Command> {
     private NetconfNotifyOriginator  notifyFunction = null;
     private final Console console;
     private final MediatorConnectionListener mConnectionListener;
-    
+
     private Netconf2SNMPFactory(MessageStore messageStore, BehaviourContainer behaviourContainer, NetconfNotifyOriginator notifyFunction, Netconf2SNMPNetworkElement ne,MediatorConnectionListener connectionListener, Console console) {
         this.messageStore = messageStore;
         this.behaviourContainer = behaviourContainer;

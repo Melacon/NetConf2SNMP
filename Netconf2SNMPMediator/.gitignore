@@ -1,0 +1,19 @@
+*.class
+*.log
+*.log*
+*.zip
+status.json
+
+# Package Files #
+*.war
+*.ear
+
+# Eclipse files #
+.settings
+
+# Maven builds #
+target
+/test.pid
+/.checkstyle
+build/*.jar
+.classpath

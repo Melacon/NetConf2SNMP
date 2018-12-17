@@ -1,71 +1,71 @@
 package com.technologies.highstreet.deviceslib.data;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 
-public class DataRow extends ArrayList<Object>{
+public class DataRow extends HashMap<String,Object>{
 	/**
 	 *
 	 */
 	private static final long serialVersionUID = -4503230493466281384L;
 	private static final Object EMPTY = "";
-	private static int keyHelper=1;
 	private final String key;
 	public String getKey() {return this.key;}
+	private boolean autoCreate;
 	public DataRow()
 	{
 		this((String)null);
 	}
-	public DataRow(Object[] values)
-	{
-		this(String.format("%d",keyHelper++),values);
-	}
 	public DataRow(String k,Object[] values) {
+		this(k,values,true);
+	}
+
+	public DataRow(String k,Object[] values,boolean autocreate) {
+		this.autoCreate = autocreate;
 		this.key=k;
 		if(values!=null)
 		{
+			int i=0;
 			for(Object o:values)
-				this.add(o);
+				this.put(String.format("%d",i++),o);
 		}
 	}
 	public DataRow(String k) {
 		this(k,null);
 	}
-	public void setSize(int size) {
-		if (size > this.size()) {
-			while (size > this.size())
-				this.add(EMPTY);
-		} else if (size < this.size())// reduce rows
-		{
-			while (size < this.size())
-				this.remove(this.size() - 1);
-		}
-	}
+	private String getKeyByInt(int i)
+	{return String.valueOf(i);}
 
 	public Object getValueAt(int col) {
 		if (col < this.size())
-			return this.get(col);
+			return this.get(String.valueOf(col));
 		return null;
 	}
-
+	public boolean setValue(String colKey, Object value) {
+		this.put(colKey, value);
+		return true;
+	}
 	public boolean setValueAt(int col, Object value) {
-		if(col<this.size())
+		if(this.autoCreate)
 		{
-			this.set(col, value);
-			return true;
+			this.put(getKeyByInt(col),null);
+		}
+		if(this.containsKey(getKeyByInt(col)))
+		{
+			return this.setValue(getKeyByInt(col), value);
 		}
 		return false;
 	}
-	public String toString(String seperator) {
+	public String toString(String[] cols,String seperator) {
 		String s="";
-		if(this.size()>0)
-			s=this.getString(0);
-		for(int i=1;i<this.size();i++)
-			s+=seperator+this.getString(i);
+		if(cols.length>0)
+			s=this.getString(cols[0]);
+		for(int i=1;i<cols.length;i++)
+			s+=seperator+this.getString(cols[i]);
 		return s;
 	}
-	private String getString(int i) {
-		if(i<this.size() && this.get(i)!=null)
-			return this.get(i).toString();
+	private String getString(String key) {
+		if(this.containsKey(key))
+			return this.get(key).toString();
 		return "null";
 	}
 }

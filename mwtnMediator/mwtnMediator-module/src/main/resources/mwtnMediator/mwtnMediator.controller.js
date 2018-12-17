@@ -13,13 +13,25 @@ define(['app/mwtnMediator/mwtnMediator.module',
 
   var mediatorServer;
   var autoRefresh;
+  var refresh = function(s)
+	{
+		try{
+			//	s.$apply();
+			var phase = s.$root.$$phase;
+			if(phase == '$apply' || phase == '$digest') {
+			 
+			} else {
+			  s.$apply();
+			}
+		}
+		catch(e){console.log("catched error:"+e);}
+	}
   mwtnMediatorApp.register.controller('mwtnMediatorCtrl', ['$scope', '$rootScope','$uibModal', '$mwtnLog', '$mwtnMediator',
     function($scope, $rootScope, $uibModal, $mwtnLog, $mwtnMediator) {
 	autoRefresh=false;
     var COMPONENT = 'mwtnMediatorCtrl';
     $mwtnLog.info({component: COMPONENT, message: 'mwtnMediatorCtrl started!'});
     $rootScope.section_logo = 'src/app/mwtnMediator/images/mwtnMediator.png'; // Add your topbar logo location here such as 'assets/images/logo_topology.gif'
-    $scope.odlKarafVersion = $mwtnMediator.odlKarafVersion;
     $scope.highlightFilteredHeader = $mwtnMediator.highlightFilteredHeader;
 
 
@@ -39,6 +51,8 @@ define(['app/mwtnMediator/mwtnMediator.module',
     	'<span class="fa fa-check-circle-o mwtnMediatorCStatusIcon" style="color:green;" ng-show="grid.getCellValue(row, col).Netconf"></span>',
     	'<span class="fa fa-times-circle-o mwtnMediatorCStatusIcon" style="color:red;" ng-show="!grid.getCellValue(row, col).Netconf"></span>',
     	'<span class="fa fa-minus mwtnMediatorCStatusIcon" style="color:green;font-weight:bold;" ng-show="grid.getCellValue(row, col).Netconf"></span>',
+    	'<span class="mwtnMediatorCStatusIcon" style="font-size:1.6rem;margin-left: 0.2rem;margin-right: 0.2rem;color:green;font-weight:bold;" ng-show="grid.getCellValue(row, col).Netconf">{{grid.getCellValue(row, col).NetconfConnetionsString}}</span>',
+    	'<span class="fa fa-minus mwtnMediatorCStatusIcon" style="color:green;font-weight:bold;" ng-show="grid.getCellValue(row, col).Netconf"></span>',
     	'<span class="fa fa-ellipsis-h mwtnMediatorCStatusIcon" style="color:red;font-weight:bold;" ng-show="!grid.getCellValue(row, col).Netconf"></span>',
     	'<span class="fa fa-dot-circle-o mwtnMediatorCStatusIcon" style="font-size:3rem;color:#666;"></span>',
     	'<span class="fa fa-minus mwtnMediatorCStatusIcon" style="color:green;font-weight:bold;" ng-show="grid.getCellValue(row, col).NetworkElement"></span>',
@@ -50,8 +64,8 @@ define(['app/mwtnMediator/mwtnMediator.module',
 
    	var requiredNesActionCellTemplate = [
       '<a class="vCenter" ng-class="{attention: grid.appScope.hover}" >',
-      '<button class="btn btn-primary" ng-click="grid.appScope.startMediator(row.entity)">Start</button>',
-      '<button class="btn btn-default" ng-click="grid.appScope.stopMediator(row.entity)">Stop</button>',
+      '<button id="btn_startm_{{grid.getCellValue(row,col).Name}}" class="btn btn-primary" ng-click="grid.appScope.startMediator(row.entity)">Start&nbsp;<i class="fa fa-spinner fa-spin" style="display:none;"></i></button>',
+      '<button id="btn_stopm_{{grid.getCellValue(row,col).Name}}" class="btn btn-default" ng-click="grid.appScope.stopMediator(row.entity)">Stop</button>',
       '<button class="btn btn-default" ng-click="grid.appScope.showDetails(row.entity)"><i class="fa fa-info-circle" aria-hidden="true"></i></button>',
       '</a>' ].join('<span>&nbsp;</span>');
 
@@ -66,7 +80,7 @@ define(['app/mwtnMediator/mwtnMediator.module',
     	   enableSorting : false,
            enableFiltering: false,
            cellTemplate:connectionStatusCellTemplate,
-           width : 150
+           width : 200
        },
        {  name : 'actions',
           enableSorting : false,
@@ -88,15 +102,23 @@ define(['app/mwtnMediator/mwtnMediator.module',
     	{
     		mediatorServer.LoadConfigs(function(configs){
 			   $scope.data = configs;
-			   $scope.$apply();
+			   refresh($scope);
 			   i.removeClass("fa-spin");
 		    },
 			function(err){
 				$scope.data = [];
-				$scope.$apply();
+				refresh($scope);
 			    i.removeClass("fa-spin");
 			  	console.log("cannot reach mediatorserver:"+err);
 			});
+    		mediatorServer.LoadVersion(function(versions){
+    			mediatorServer.LoadSupportedDevices(function(){},function(err2){
+        			console.log("cannot reach mediatorserver:"+err2);
+    			});
+    		},function(err3){
+    			
+    			console.log("cannot reach mediatorserver:"+err3);
+    		});
 		}
     }
     var refreshMediator = function(name)
@@ -105,7 +127,7 @@ define(['app/mwtnMediator/mwtnMediator.module',
     	if(mediatorServer!==undefined)
     	{
     		mediatorServer.ReloadConfig(name,function(changes){
-			   $scope.$apply();
+			   refresh($scope);
 			},
 			function(err){
 				console.log("cannot reach mediatorserver:"+err);
@@ -192,19 +214,31 @@ define(['app/mwtnMediator/mwtnMediator.module',
 
     $scope.startMediator =  function(el)
     {
-    	var btn=$(this);
+    	var btnSel="#btn_startm_"+el.Name;
+    	var btn=$(btnSel);
     	if(btn!==undefined)
+    	{
     		btn.prop('disabled',true);
+    		btn.find('i').css({display:'inline-block'});
+    	}
     	console.log("starting mediator "+el.Name+" ...");
     	if(mediatorServer!==undefined)
     	{
+    		var delay=2000;
     		mediatorServer.StartMediator(el.Name,function(res){
-    			refreshMediator(el.Name);
+    			setTimeout(function(){
+    				refreshMediator(el.Name);		
+    			},delay);
     			//console.log(res);
     		},function(err){
-    			if(btn!==undefined)
-    	    		btn.prop('disabled',false);
-    		//	console.log("error starting mediator");
+    			setTimeout(function(){
+	    			if(btn!==undefined)
+	    			{
+	    				btn.prop('disabled',false);
+	    				btn.find('i').css({display:'none'});
+	    			}
+	    		//	console.log("error starting mediator");
+    			},delay);
     		});
     	}
     }
@@ -282,14 +316,56 @@ define(['app/mwtnMediator/mwtnMediator.module',
   /************************************************************************************
    * medaitorDetails Controller definition
    ************************************************************************************/
-  mwtnMediatorApp.register.controller('MediatorDetailsCtrl', ['$scope', '$uibModalInstance', '$uibModal', '$mwtnConnect', '$mwtnLog', 'currentElement',
-                                                                  function ($scope, $uibModalInstance, $uibModal, $mwtnConnect, $mwtnLog, currentElement) {
+  mwtnMediatorApp.register.controller('MediatorDetailsCtrl', ['$scope', '$uibModalInstance', '$uibModal', '$mwtnConnect', '$mwtnLog', '$mwtnMediator','currentElement',
+                                                                  function ($scope, $uibModalInstance, $uibModal, $mwtnConnect, $mwtnLog, $mwtnMediator, currentElement) {
 
-    	var COMPONENT = 'MediatorDetailsCtrl';
+	   	var COMPONENT = 'MediatorDetailsCtrl';
     	var element = currentElement;
+    	var error = function(msg)
+    	{
+    		$scope.statusmessage='';
+        	$scope.errormessage=msg;
+        	refresh($scope);
+    	}
+    	var status = function(msg)
+    	{
+    		$scope.statusmessage=msg;
+        	$scope.errormessage='';
+        	refresh($scope);
+    	}
+    	var reloadDelayed = function()
+    	{
+    		setTimeout(function(){
+	    		mediatorServer.ReloadConfig(element.Name,function(res){
+	    			refresh($scope);
+	    		},function(err){error(err);});
+    		},1000);
+    	}
+    	var refreshLogs = function()
+    	{
+    		mediatorServer.LoadLogs(currentElement.Name,function(res){
+    			$scope.logdata=res;
+    			refresh($scope);
+
+    		},function(err){
+    			$scope.logdata=[];
+    			refresh($scope);
+    		});
+    	}
     	$scope.statusmessage='';
     	$scope.errormessage='';
-    	// $mwtnLog.info({component: COMPONENT, message: 'MediatorDetailsCtrl started!'});
+    	$scope.logGridOptions = JSON.parse(JSON.stringify($mwtnMediator.logGridOptions));
+	    //$scope.logGridOptions.rowHeight = 44;
+	    $scope.logGridOptions.columnDefs = [
+	        { field: 'ts',  type: 'string', displayName: 'Timestamp',  headerCellClass: $scope.highlightFilteredHeader, width : 180 },
+	        { field: 'lvl', type: 'String', displayName: 'LogLevel', headerCellClass: $scope.highlightFilteredHeader, width : 90 },
+	        { field: 'src',  type: 'string', displayName: 'Source',  headerCellClass: $scope.highlightFilteredHeader, width : 120 },
+	        { field: 'msg',  type: 'string', displayName: 'Message',  headerCellClass: $scope.highlightFilteredHeader, width : 300 },
+
+	      ];
+	    $scope.logGridOptions.data = 'logdata';
+		// $mwtnLog.info({component: COMPONENT, message: 'MediatorDetailsCtrl started!'});
+		currentElement.RefreshDeviceName(mediatorServer);
 		$scope.data = {
 			el:currentElement
 		};
@@ -303,16 +379,12 @@ define(['app/mwtnMediator/mwtnMediator.module',
     		mediatorServer.StartMediator(element.Name,function(res){
     			if(btn!==undefined)
         			btn.prop('disabled', true);
-    			$scope.errormessage='';
-    			$scope.statusmessage=res;
-    			$scope.$apply();
-
+    			status(res);
+    			reloadDelayed();
     		},function(err){
     			if(btn!==undefined)
         			btn.prop('disabled', false);
-    			$scope.errormessage=err;
-    			$scope.statusmessage='';
-    			$scope.$apply();
+    			error(err);
 
     		});
     	};
@@ -323,16 +395,12 @@ define(['app/mwtnMediator/mwtnMediator.module',
     		mediatorServer.StopMediator(element.Name,function(res){
     			if(btn!==undefined)
         			btn.prop('disabled', true);
-    			$scope.errormessage='';
-    			$scope.statusmessage=res;
-    			$scope.$apply();
-
+    			status(res);
+    			reloadDelayed();
     		},function(err){
     			if(btn!==undefined)
         			btn.prop('disabled', false);
-    			$scope.errormessage=err;
-    			$scope.statusmessage='';
-    			$scope.$apply();
+    			error(err);
 
     		});
     	};
@@ -343,13 +411,11 @@ define(['app/mwtnMediator/mwtnMediator.module',
     		if(confirm("Do you really want to delete this mediator?"))
     		{
     			mediatorServer.DeleteMediator(element.Name,function(res){
-
+    				status(res);
     			},function(err){
     				if(btn!==undefined)
             			btn.prop('disabled', false);
-        			$scope.errormessage=err;
-        			$scope.statusmessage='';
-        			$scope.$apply();
+        			error(err);
     			});
     		}
     		else
@@ -358,7 +424,20 @@ define(['app/mwtnMediator/mwtnMediator.module',
         			btn.prop('disabled', false);
     		}
     	};
-
+    	$scope.unlock = function(){
+    		var btn=$(this);
+    		if(btn!==undefined)
+    			btn.prop('disabled', true);
+    		mediatorServer.ClearLock(element.Name,function(res){
+    			status(res);
+    			reloadDelayed();
+    		},function(err){
+    			if(btn!==undefined)
+            		btn.prop('disabled', false);
+        		error(err);
+    		});
+    	}
+    	refreshLogs();
   	}
   ]);
   /************************************************************************************
@@ -369,20 +448,73 @@ define(['app/mwtnMediator/mwtnMediator.module',
 
     	var COMPONENT = 'MediatorNewCtrl';
     	// $mwtnLog.info({component: COMPONENT, message: COMPONENT + ' started!'});
-
+    	var status = function(msg)
+    	{
+    		$scope.statusmessage=msg;
+			$scope.errormessage="";
+			refresh($scope);
+    	}
+    	var error = function(msg)
+    	{
+    		$scope.statusmessage="";
+			$scope.errormessage=msg;
+			refresh($scope);
+		}
+		
     	$scope.options={
     		nexmlmodel:[],
-    		nedevicetype:MediatorConfig.DeviceTypes
+			nedevicetype:mediatorServer.GetSupportedDevices(),
+			shownemodels:mediatorServer.SupportsAutoDevice()
     	};
-    	$scope.mediator={name:'',devicetype:0,remoteip:'',trapsport:0,ncport:0,nexml:''};
+    	$scope.mediator={name:'',devicetype:0,remoteip:'',remoteport:161,trapsport:0,ncport:0,nexml:''};
+    	$scope.odlconfig=mediatorServer.GetDefaultODLConfig();
+    	$scope.odlsavebtn={enabled:false};
 
+    	//=======load data
     	mediatorServer.LoadNetworkElementXMLFiles(function(xmlNames){
     		$scope.options.nexmlmodel=xmlNames;
-    		$scope.$apply();
+    		refresh($scope);
+    	},function(err){
+    		error(err);
     	});
+    	mediatorServer.LoadAvailableNCPorts(function(portValues){
+    		if(portValues!==undefined && portValues.length>0)
+    		{
+    			$scope.mediator.ncport = portValues[0];
+    		}
+    	},function(err){error(err);});
+    	mediatorServer.LoadAvailableSnmpPorts(function(portValues){
+    		if(portValues!==undefined && portValues.length>0)
+    		{
+    			$scope.mediator.trapsport = portValues[0];
+    		}
+    	},function(err){error(err);});
+		mediatorServer.LoadSupportedDevices(function(devices){
+			$scope.options.nedevicetype=devices;
+			refresh($scope);
+		},function(err){error(err);});
+
     	$scope.errormessage='';
     	$scope.statusmessage='';
-
+		
+		//====handle events========
+		$scope.devicechange = function(){
+			var x=$scope.mediator.devicetype;
+			var xml=mediatorServer.GetXmlByType(x);
+			if(xml!==undefined && xml!="null")
+			{
+				$scope.mediator.nexml=xml;
+				refresh($scope);
+			}
+		}
+    	$scope.odledit = function(){
+    		$scope.odlsavebtn.enabled=true;
+    		console.log("enable odl configs")
+    		refresh($scope);
+    	}
+    	$scope.odlsave = function(){
+    		mediatorServer.SetDefaultODLConfig($scope.odlconfig);
+    	}
 		$scope.ok = function () {
 			var btn=$(this);
 			if(btn!==undefined)
@@ -390,31 +522,28 @@ define(['app/mwtnMediator/mwtnMediator.module',
 			mediatorServer.CreateMediator($scope.mediator.name,
 										$scope.mediator.devicetype,
 										$scope.mediator.remoteip,
+										$scope.mediator.remoteport,
 										$scope.mediator.trapsport,
 										$scope.mediator.nexml,
 										$scope.mediator.ncport,
 				function(e){
 					if(e==true)
 					{
-						$scope.statusmessage="mediator created";
-						$scope.errormessage="";
-						$scope.$apply();
+						status("mediator created");
 						setTimeout(function(){$uibModalInstance.close();},2000);
 					}
 					else
 					{
 						if(btn!==undefined)
 							btn.prop('disabled', false);
-						$scope.statusmessage="";
-						$scope.errormessage=e;
-						$scope.$apply();
+						error(e);
+
 					}
 				},function(err){
 					if(btn!==undefined)
 						btn.prop('disabled', false);
-					$scope.statusmessage="";
-					$scope.errormessage=e;
-					$scope.$apply();
+					error(err);
+
 				});
 
     	};
@@ -439,9 +568,13 @@ define(['app/mwtnMediator/mwtnMediator.module',
     		var tbxId=$('#tbx_mediatorserver-id');
     		var tbxName=$('#tbx_mediatorserver-name');
     		var tbxHost = $('#tbx_mediatorserver-host');
+    		var tbxVersion = $('#tbx_mediatorserver-version');
+    		var tbxVersionMed = $('#tbx_mediatorserver-medversion');
     		tbxId.prop('disabled',true);
     		tbxName.prop('disabled',true);
     		tbxHost.prop('disabled',true);
+    		tbxVersion.prop('disabled',true);
+    		tbxVersionMed.prop('disabled',true);
 
     		$mwtnMediator.getServerData(id).then(function(data){
     			if(data!==undefined)
@@ -449,7 +582,24 @@ define(['app/mwtnMediator/mwtnMediator.module',
     				tbxId.val(data.id);
     				tbxName.val(data.name);
     				tbxHost.val(data.url);
+    				tbxVersion.val("");
+					tbxVersionMed.val("");
+    				var s=new MediatorServer(data.url);
+    				s.LoadVersion(function(d){
+    					tbxVersion.val(d.server);
+    					tbxVersionMed.val(d.mediator);
+
+    				},function(err){
+
+    				});
         		}
+    		});
+    	}
+    	var create = function(host,name,port)
+    	{
+    		var url=host+":"+port;
+    		$mwtnMediator.addServer(name,url).then(function(data){
+    			reload();
     		});
     	}
     	var onEdit = function(id)
@@ -464,47 +614,47 @@ define(['app/mwtnMediator/mwtnMediator.module',
     	{
     		if(confirm("Do you really want to delete?"))
     		{
-    			console.log("delete server with id="+id);
-    		}
-    		else
-    		{
-    			console.log("dont delete");
+    		//	console.log("delete server with id="+id);
+    			$mwtnMediator.removeServer(id).then(function(){reload();});
     		}
     	}
-    	$mwtnMediator.getServerData().then(function(data){
+    	var reload = function(){
+	    	$mwtnMediator.getServerData().then(function(data){
 
-    		//fill table
-    		var list=$('#mediatorserver-list');
-    		list.html('');
-    		if(data!==undefined && data.length>0)
-    		{
-    			for(var i=0;i<data.length;i++)
-    			{
-    				var desc=$('<span class="desc" id="item_'+data[i].id+'">'+data[i].name+'</span>');
-    				var li=$('<li></li>');
-    				var iconsbox=$('<div class="icons"></div>');
-    				var edit=$('<span class="fa fa-edit" id="item_edit_'+data[i].id+'"></span>');
-    				var del=$('<span class="fa fa-trash-o" id="item_del_'+data[i].id+'"></span>');
-    				iconsbox.html([edit,del]);
-    				li.html([desc,iconsbox]);
-    				if(i==0)
-    					li.addClass("selected");
-    				//register click handlers
-    				desc.click(function(){
-    					$('#mediatorserver-list > li').removeClass('selected');
-    					onServerRowSelect(this.parentNode,$(this).prop('id').substr(5));
-    				});
-    				edit.click(function(){
-    					onEdit($(this).prop('id').substr(10));
-    				});
-    				del.click(function(){
-    					onDelete($(this).prop('id').substr(9));
-    				});
-    				list.append(li);
-    			}
-    			onServerRowSelect(undefined,data[0].id);
-    		}
-    	});
+	    		//fill table
+	    		var list=$('#mediatorserver-list');
+	    		list.html('');
+	    		if(data!==undefined && data.length>0)
+	    		{
+	    			for(var i=0;i<data.length;i++)
+	    			{
+	    				var desc=$('<span class="desc" id="item_'+data[i].id+'">'+data[i].name+'</span>');
+	    				var li=$('<li></li>');
+	    				var iconsbox=$('<div class="icons"></div>');
+	    				var edit=$('<span class="fa fa-edit" id="item_edit_'+data[i].id+'"></span>');
+	    				var del=$('<span class="fa fa-trash-o" id="item_del_'+data[i].id+'"></span>');
+	    				iconsbox.html([edit,del]);
+	    				li.html([desc,iconsbox]);
+	    				if(i==0)
+	    					li.addClass("selected");
+	    				//register click handlers
+	    				desc.click(function(){
+	    					$('#mediatorserver-list > li').removeClass('selected');
+	    					onServerRowSelect(this.parentNode,$(this).prop('id').substr(5));
+	    				});
+	    				edit.click(function(){
+	    					onEdit($(this).prop('id').substr(10));
+	    				});
+	    				del.click(function(){
+	    					onDelete($(this).prop('id').substr(9));
+	    				});
+	    				list.append(li);
+	    			}
+	    			onServerRowSelect(undefined,data[0].id);
+	    		}
+	    	});
+    	}
+    	reload();
     	$scope.close = function(){
     		$uibModalInstance.close();
     	};

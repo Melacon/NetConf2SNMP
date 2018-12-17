@@ -1,537 +1,475 @@
 package com.technologies.highstreet.netconf2snmpmediator.server;
 
-import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.xpath.XPathExpressionException;
+import java.util.Properties;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.apache.log4j.RollingFileAppender;
-import org.apache.sshd.SshServer;
+import org.apache.sshd.common.FactoryManager;
 import org.apache.sshd.common.NamedFactory;
-import org.apache.sshd.server.Command;
+import org.apache.sshd.common.PropertyResolverUtils;
+import org.apache.sshd.common.session.Session;
+import org.apache.sshd.common.session.SessionListener;
+import org.apache.sshd.server.command.Command;
+import org.apache.sshd.server.ServerFactoryManager;
+import org.apache.sshd.server.SshServer;
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
-import org.xml.sax.SAXException;
+import org.w3c.dom.Document;
 
-import com.technologies.highstreet.deviceslib.data.SNMPDeviceType;
+import com.technologies.highstreet.mediatorlib.data.MediatorStatusFile;
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.Console;
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.SnmpKeyValuePairList;
+import com.technologies.highstreet.mediatorlib.netconf.server.networkelement.NodeEditConfigCollection;
+import com.technologies.highstreet.mediatorlib.netconf.server.types.NetconfTagList;
 import com.technologies.highstreet.netconf.server.basetypes.Behaviour;
 import com.technologies.highstreet.netconf.server.basetypes.BehaviourContainer;
-import com.technologies.highstreet.netconf.server.basetypes.Console;
+import com.technologies.highstreet.netconf.server.basetypes.ConnectionInfo;
 import com.technologies.highstreet.netconf.server.basetypes.MessageStore;
-import com.technologies.highstreet.netconf.server.basetypes.UserCommand;
+import com.technologies.highstreet.netconf.server.control.BaseNetconfController;
 import com.technologies.highstreet.netconf.server.control.NetconfNotifyExecutor;
 import com.technologies.highstreet.netconf.server.control.NetconfNotifyOriginator;
 import com.technologies.highstreet.netconf.server.exceptions.ServerException;
 import com.technologies.highstreet.netconf.server.ssh.AlwaysTruePasswordAuthenticator;
-import com.technologies.highstreet.netconf.server.streamprocessing.NetconfStreamCodecThread;
+import com.technologies.highstreet.netconf.server.ssh.UserPasswordAuthenticator;
 import com.technologies.highstreet.netconf2snmpmediator.server.control.Netconf2SNMPFactory;
+import com.technologies.highstreet.netconf2snmpmediator.server.networkelement.IOnPluginEventListener;
+import com.technologies.highstreet.netconf2snmpmediator.server.networkelement.IOnTrapReceivedListener;
 import com.technologies.highstreet.netconf2snmpmediator.server.networkelement.Netconf2SNMPNetworkElement;
 import com.technologies.highstreet.netconf2snmpmediator.server.streamProcessing.MediatorConnectionListener;
 import com.technologies.highstreet.netconf2snmpmediator.server.streamProcessing.SNMPDevicePollingThread;
 
 import net.i2cat.netconf.rpc.RPCElement;
 
-public class Netconf2SNMPMediator implements MessageStore, BehaviourContainer, NetconfNotifyOriginator, Console {
+/**
+ *
+ *
+ * @author Micha
+ */
 
-	private static Log LOG;
-	private static final String VERSION = "1.1 - ONF 4th PoC";
-	private static final String MEDIATORSERVER_CONFIGFILENAME = "/etc/mediatorserver.conf";
-	private static boolean CLIMODE = false;
+public class Netconf2SNMPMediator extends PluginableMediator implements IOnPluginEventListener,IOnTrapReceivedListener,MessageStore, BehaviourContainer, NetconfNotifyOriginator {
 
-	private SshServer sshd;
+    private static final long SSH_TIMEOUT_MS = 1000*60*60; //60 minuts
 
-	// stored messages
-	//private boolean storeMessages = false;
-	private List<RPCElement> messages;
+	private static final Object REKEY_LIMIT_2MIN_MS = 2*60*1000;
 
-	// behaviours
-	private List<Behaviour> behaviours;
+	protected static final boolean LIMIT = false;
 
-	protected NetconfNotifyExecutor netconfNotifyExecutor = null;
+	private static Log LOG = LogFactory.getLog(Netconf2SNMPMediator.class);;
 
-	private DeviceConnectionMonitor deviceConnectionMonitor=null;
-	private NMSTrapPortMapper nms = null;
-	private Timer nmsWatchdog = null;
+    private SshServer sshd;
 
-	private MediatorConfig configFile;
+    // stored messages
+    private List<RPCElement> messages;
 
-	// hide default constructor, forcing using factory method
-	private Netconf2SNMPMediator() {
+    // behaviours
+    private List<Behaviour> behaviours;
 
-	}
 
-	/**
-	 * Server factory creates a server
-	 */
-	public static Netconf2SNMPMediator createServer() {
-		Netconf2SNMPMediator server = new Netconf2SNMPMediator();
-		server.messages = new ArrayList<>();
-//		server.storeMessages = false;
-		return server;
-	}
+    //protected NetconfNotifyExecutor netconfNotifyExecutor = null;
+    private final List<NetconfNotifyExecutor> netconfNotifyExecutorList;
+    private DeviceConnectionMonitor deviceConnectionMonitor=null;
+    private final SNMPMediatorConfig configFile;
+    private boolean mIsRunning;
 
-	private final MediatorConnectionListener mediatorConnectionListener = new MediatorConnectionListener() {
+    private final MediatorStatusFile statusFile;
 
-		@Override
-		public void netconfOnDisconnect() {
-			LOG.debug("netconf disconnected");
-			if (Netconf2SNMPMediator.this.configFile != null) {
-				Netconf2SNMPMediator.this.configFile.setIsNetconfConnected(false);
-				try {
-					Netconf2SNMPMediator.this.configFile.save();
-				} catch (Exception e) {
-					LOG.error("error saving netconf status to config file");
-				}
-			}
-			if(Netconf2SNMPMediator.this.deviceConnectionMonitor!=null)
-				Netconf2SNMPMediator.this.deviceConnectionMonitor.setIOStream(null);
+	private final Console console;
 
-		}
 
-		@Override
-		public void netconfOnConnect(NetconfStreamCodecThread ioCodec) {
-			LOG.debug("netconf connected");
-			if (Netconf2SNMPMediator.this.configFile != null) {
-				Netconf2SNMPMediator.this.configFile.setIsNetconfConnected(true);
-				try {
-					Netconf2SNMPMediator.this.configFile.save();
-				} catch (Exception e) {
-					LOG.error("error saving netconf status to config file");
-				}
-			}
-			if(Netconf2SNMPMediator.this.deviceConnectionMonitor!=null)
-				Netconf2SNMPMediator.this.deviceConnectionMonitor.setIOStream(ioCodec);
-		}
+    public boolean isRunning() {
+        return this.mIsRunning;
+    }
 
-		@Override
-		public void networkElementOnConnect() {
-			if (Netconf2SNMPMediator.this.configFile != null) {
-				Netconf2SNMPMediator.this.configFile.setIsNeConnected(true);
-				try {
-					Netconf2SNMPMediator.this.configFile.save();
-				} catch (Exception e) {
-					LOG.error("error saving ne connection status to config file");
-				}
-			}
-		}
 
-		@Override
-		public void networkElementOnDisconnect() {
-			if (Netconf2SNMPMediator.this.configFile != null) {
-				Netconf2SNMPMediator.this.configFile.setIsNeConnected(false);
-				try {
-					Netconf2SNMPMediator.this.configFile.save();
-				} catch (Exception e) {
-					LOG.error("error saving ne connection status to config file");
-				}
-			}
-		}
-	};
+    // hide default constructor, forcing using factory method
+    private Netconf2SNMPMediator(SNMPMediatorConfig cfg, MediatorStatusFile status,Console console) {
+        super();
+        this.netconfNotifyExecutorList=new ArrayList<>();
+        this.configFile = cfg;
+        this.statusFile = status;
+        this.console = console;
+    }
 
-	/**
-	 * Initializes the server
-	 *
-	 * @param host
-	 *            host name (use null to listen in all interfaces)
-	 * @param listeningPort
-	 *            where the server will listen for SSH connections
-	 * @param ne
-	 *            with NetworkElement model
-	 * @param devNum
-	 *            number of interface card
-	 *
-	 */
-	private void initializeServer(String host, int listeningPort, Netconf2SNMPNetworkElement sne, MediatorConfig cfg,
-			int devNum) {
-		LOG.info(staticCliOutputNewLine("Configuring mediator ..."));
-		configFile = cfg;
-		sshd = SshServer.setUpDefaultServer();
-		sshd.setHost(host);
-		sshd.setPort(listeningPort);
+    /**
+     * Server factory creates a server
+     * @param cfg configuration
+     * @param status Statusfile for debugging
+     * @return server
+     */
+    public static Netconf2SNMPMediator createServer(SNMPMediatorConfig cfg, MediatorStatusFile status, Console console) {
+        Netconf2SNMPMediator server = new Netconf2SNMPMediator(cfg,status,console);
+        server.messages = new ArrayList<>();
+//        server.storeMessages = false;
+        return server;
+    }
 
-		LOG.info(staticCliOutputNewLine("Host: '" + host + "', listenig port: " + listeningPort));
+    /**
+     * listener for netconf and remote device connection status
+     */
+    private final MediatorConnectionListener mediatorConnectionListener = new MediatorConnectionListener() {
 
-		sshd.setPasswordAuthenticator(new AlwaysTruePasswordAuthenticator());
-		sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider(""));
+        @Override
+        public void netconfOnDisconnect() {
+            LOG.debug("netconf disconnected");
+         /*   if (Netconf2SNMPMediator.this.configFile != null) {
+                Netconf2SNMPMediator.this.configFile.setIsNetconfConnected(false);
+                try {
+                    Netconf2SNMPMediator.this.configFile.save();
+                } catch (Exception e) {
+                    LOG.error("error saving netconf status to config file");
+                }
+            }
+		*/
+        }
 
-		List<NamedFactory<Command>> subsystemFactories = new ArrayList<>();
-		subsystemFactories
-				.add(Netconf2SNMPFactory.createFactory(this, this, this, sne, mediatorConnectionListener, this));
-		sshd.setSubsystemFactories(subsystemFactories);
+        @Override
+        public void netconfOnConnect() {
+            LOG.debug("netconf connected");
+          /*  if (Netconf2SNMPMediator.this.configFile != null) {
+                Netconf2SNMPMediator.this.configFile.setIsNetconfConnected(true);
+                try {
+                    Netconf2SNMPMediator.this.configFile.save();
+                } catch (Exception e) {
+                    LOG.error("error saving netconf status to config file");
+                }
+            }
+            */
+        }
 
-		if (Config.IsPortMapperNeeded()) {
-			String myip = "";
-			try {
-				myip = getNetworkIp(devNum);
+        @Override
+        public void networkElementOnConnect() {
+          /*  if (Netconf2SNMPMediator.this.configFile != null) {
+                Netconf2SNMPMediator.this.configFile.setIsNeConnected(true);
+                try {
+                    Netconf2SNMPMediator.this.configFile.save();
+                } catch (Exception e) {
+                    LOG.error("problem saving ne connection status to config file");
+                }
+            }
+            */
+            if (Netconf2SNMPMediator.this.statusFile != null) {
+                Netconf2SNMPMediator.this.statusFile.setIsNeConnected(true);
+                try {
+                    Netconf2SNMPMediator.this.statusFile.save();
+                } catch (Exception e) {
+                    LOG.error("problem saving ne connection status to status file");
+                }
+            }
+        }
 
-			} catch (SocketException e) {
-				LOG.error("failed to detect ip for " + devNum);
-				;
-			} catch (Exception e) {
-				LOG.error(e.getMessage());
-			}
-			sne.setDeviceIp(myip);
-			LOG.info(staticCliOutputNewLine("registering Mediator on TrapPortMapper: '" + sne.getDeviceIp()
-					+ "', for port: " + sne.getSNMPTrapPort() + " with ip=" + myip));
-			nms = new NMSTrapPortMapper();
-			if (!nms.registerSync(myip, sne.getDeviceIp(), sne.getSNMPTrapPort())) {
-				LOG.warn(staticCliOutputNewLine("failed to register on trap portmapper"));
-			} else {
-				int response = nms.checkMaster();
-				switch (response) {
-				case NMSTrapPortMapper.RET_VALUE_CHECKMASTER_YOUARE: // this
-																		// mediator
-																		// is
-																		// the
-																		// watchdog
-																		// for
-																		// PortMapper
-					Config.getInstance().PortMapperMaster = true;
-					this.startPortMapperWatchdog();
-					break;
-				case NMSTrapPortMapper.RET_VALUE_CHECKMASTER_YOUARENOT: // everything
-																		// is
-																		// okay
-					Config.getInstance().PortMapperMaster = false;
-					break;
-				case NMSTrapPortMapper.RET_VALUE_INVALID_RESPONSE:
-					LOG.warn(String.format("received invalid response (%d) from TrapPortMapper", response));
-					break;
-				case NMSTrapPortMapper.RET_VALUE_NORESPONSE:
-					LOG.warn("TrapPortMapper is not responding on request");
-					break;
-				}
-			}
-		}
-		this.deviceConnectionMonitor=new DeviceConnectionMonitor(sne,null,this.mediatorConnectionListener);
-		LOG.info(staticCliOutputNewLine("Mediator configured."));
-	}
+        @Override
+        public void networkElementOnDisconnect() {
+            /*if (Netconf2SNMPMediator.this.configFile != null) {
+                Netconf2SNMPMediator.this.configFile.setIsNeConnected(false);
+                try {
+                    Netconf2SNMPMediator.this.configFile.save();
+                } catch (Exception e) {
+                    LOG.error("problem saving ne connection status to config file");
+                }
+            }
+            */
+            if (Netconf2SNMPMediator.this.statusFile != null) {
+                Netconf2SNMPMediator.this.statusFile.setIsNeConnected(false);
+                try {
+                    Netconf2SNMPMediator.this.statusFile.save();
+                } catch (Exception e) {
+                    LOG.error("problem saving ne connection status to status file");
+                }
+            }
+        }
+    };
 
-	private void startPortMapperWatchdog() {
-		TimerTask task = new TimerTask() {
-
-			@Override
-			public void run() {
-				if (!nms.ping()) // ping failed
-				{
-					// send alert notfication via netconf
-					Netconf2SNMPMediator.this.notify(UserCommand.SNMP_ALERTMESSAGE_PORTMAPPERNOTFOUND);
-				}
-			}
-		};
-
-		nmsWatchdog = new Timer();
-		nmsWatchdog.schedule(task, Config.getInstance().PortMapperWatchdogInterval);
-
-	}
-
-	private void stopPortMapperWatchdog() {
-		if (nmsWatchdog != null) {
-			nmsWatchdog.cancel();
-		}
-	}
-
-	@Override
-	public void defineBehaviour(Behaviour behaviour) {
-		if (behaviours == null) {
-			behaviours = new ArrayList<>();
-		}
-		synchronized (behaviours) {
-			behaviours.add(behaviour);
-		}
-	}
-
-	@Override
-	public List<Behaviour> getBehaviours() {
-		if (behaviours == null) {
-			return null;
-		}
-		synchronized (behaviours) {
-			return behaviours;
-		}
-	}
-
-	public void startServer() throws ServerException {
-		LOG.info(staticCliOutputNewLine("Starting server..."));
-		try {
-			sshd.start();
-		} catch (IOException e) {
-			LOG.error(staticCliOutputNewLine("Error starting server!" + e.getMessage()));
-			throw new ServerException("Error starting server", e);
-		}
-		LOG.info(staticCliOutputNewLine("Server started."));
-	}
-
-	public void stopServer() throws ServerException {
-		LOG.info(staticCliOutputNewLine("Stopping server..."));
-		try {
-			sshd.stop();
-			if (nms != null && nms.isRegistered()) {
-				nms.unregisterSync();
-			}
-			if(deviceConnectionMonitor!=null)
-				deviceConnectionMonitor.waitAndInterruptThreads();
-			stopPortMapperWatchdog();
-			stopSNMPThreads();
-		} catch (InterruptedException e) {
-			LOG.error(staticCliOutputNewLine("Error stopping server!" + e));
-			throw new ServerException("Error stopping server", e);
-		}
-		LOG.info(staticCliOutputNewLine("Server stopped."));
-	}
-
-	private void stopSNMPThreads() {
-		if(SNMPDevicePollingThread.isRunning())
-			SNMPDevicePollingThread.stopThread();
-	}
-
-	@Override
-	public void storeMessage(RPCElement message) {
-		if (messages != null) {
-			synchronized (messages) {
-				LOG.info("Storing message " + message.getMessageId());
-				messages.add(message);
-			}
-		}
-	}
-
-	@Override
-	public List<RPCElement> getStoredMessages() {
-		synchronized (messages) {
-			return Collections.unmodifiableList(messages);
-		}
-	}
-
-	@Override
-	public void setNetconfNotifyExecutor(NetconfNotifyExecutor executor) {
-		this.netconfNotifyExecutor = executor;
-	}
-
-	private void notify(String command) {
-		if (netconfNotifyExecutor != null) {
-			netconfNotifyExecutor.notify(command);
-		} else {
-			System.out.println("No notifier registered.");
-		}
-
-	}
-
-	private static void initDebug(String debugFilename) {
-		BasicConfigurator.configure();
-		Logger.getRootLogger().getLoggerRepository().resetConfiguration();
-
-		if(CLIMODE)
-		{
-			ConsoleAppender console = new ConsoleAppender(); // create appender
-			// configure the appender
-			// String PATTERN = "%d [%p|%c|%C{1}] %m%n";
-			String PATTERN = "%d [%p|%C{1}] %m%n";
-			console.setLayout(new PatternLayout(PATTERN));
-			console.setThreshold(Config.getInstance().LogLevel);
-			console.activateOptions();
-			// add appender to any Logger (here is root)
-			Logger.getRootLogger().addAppender(console);
-		}
-
-		RollingFileAppender fa = new RollingFileAppender();
-		fa.setName("FileLogger");
-		fa.setFile(debugFilename);
-		fa.setLayout(new PatternLayout("%d %-5p [%c] %m%n"));
-		fa.setThreshold(Config.getInstance().LogLevel);
-		fa.setMaximumFileSize(10000000);
-		fa.setAppend(true);
-		fa.setMaxBackupIndex(5);
-		fa.activateOptions();
-		// add appender to any Logger (here is root)
-		Logger.getRootLogger().addAppender(fa);
-		// repeat with all other desired appenders
-
-	}
-
-	/*
-	 * get IPv4 Address of LAN for ETHERNET Device <devNum>
-	 */
-	private static String getNetworkIp(int devNum) throws SocketException, Exception {
-		Enumeration<NetworkInterface> e = NetworkInterface.getNetworkInterfaces();
-		while (e.hasMoreElements()) {
-			if (devNum-- >= 0) {
-				continue;
-			}
-			NetworkInterface n = e.nextElement();
-			Enumeration<InetAddress> ee = n.getInetAddresses();
-			while (ee.hasMoreElements()) {
-				InetAddress i = ee.nextElement();
-				if (!(i instanceof Inet6Address)) {
-					return i.getHostAddress();
-				}
-			}
-		}
-		throw new Exception("no ip address found for selected network interface");
-	}
-
-	public static void main(String[] args) {
-
-		String title = "Netconf NE SNMP Mediator\n";
-		int optIdx=0;
-		if (args.length < 1) {
-			System.err.println("To less parameters. Command: Server configFilename [pathToYang]");
-			return;
-		}
-		if(args[0].equals("--cli"))
-		{
-			CLIMODE=true;
-			optIdx++;
-		}
-		String jsonFilename = args[optIdx++];
-		MediatorConfig cfg = null;
-		try {
-			cfg = new MediatorConfig(jsonFilename);
-			staticCliOutput("loaded config file successfully");
-			cfg.writePIDFile();
-		} catch (Exception e) {
-			staticCliOutputNewLine("Error loading config file " + jsonFilename);
-			return;
-		}
-		Config.getInstance().tryLoad(MEDIATORSERVER_CONFIGFILENAME);
-		String debugFile = cfg.getLogFilename();
-		String yangPath = args.length >= optIdx+1 ? args[optIdx++] : "yang/yangNeModel";
-		String uuid = args.length >= optIdx+1 ? args[optIdx] : "";
-		String xmlFilename = cfg.getNeXMLFilename();
-		String rootPath = "";
-		int port = cfg.getNetconfPort();
-
-		/*
-		 * if (Config.DEBUG) { rootPath = "build/"; } else { rootPath = ""; }
-		 */
-		xmlFilename = rootPath + xmlFilename;
-		yangPath = rootPath + yangPath;
-
-		staticCliOutputNewLine(title);
-		staticCliOutputNewLine("Version: " + VERSION);
-		staticCliOutputNewLine("Start parameters are:");
-		staticCliOutputNewLine("\tFilename: " + xmlFilename);
-		staticCliOutputNewLine("\tPort: " + port);
-		staticCliOutputNewLine("\tDebuginfo and communication is in file: " + debugFile);
-		staticCliOutputNewLine("\tYang files in directory: " + yangPath);
-		staticCliOutputNewLine("\tUuid: " + uuid);
-
-		initDebug(debugFile);
-
-		LOG.info(title);
-
-		Netconf2SNMPNetworkElement ne;
-		try {
-			Netconf2SNMPMediator server = Netconf2SNMPMediator.createServer();
-			ne = new Netconf2SNMPNetworkElement(xmlFilename, yangPath, uuid, SNMPDeviceType.FromInt(cfg.mDeviceType),
-					cfg.getDeviceIp(), cfg.getTrapPort(), server);
-			ne.setDeviceName(cfg.getName());
-			server.initializeServer("0.0.0.0", port, ne, cfg, Config.getInstance().MediatorDefaultNetworkInterfaceNum);
-			server.startServer();
-			if (CLIMODE == true) {
-				// read lines form input
-				BufferedReader buffer = new BufferedReader(new InputStreamReader(System.in));
-				String command;
-					while (true) {
-					staticCliOutput(port + ":" + xmlFilename + "> ");
-					command = buffer.readLine();
-					if (command != null) {
-						command = command.toLowerCase();
-					} else {
-						command = "<null>";
+    private final SessionListener sshSessionListener = new SessionListener() {
+        @Override
+        public void sessionCreated(Session session) {
+        	String remoteIp=session.getIoSession().getRemoteAddress().toString();
+            if(LIMIT)
+        	{
+        		if(Netconf2SNMPMediator.this.statusFile.getConnectionCount(remoteIp)>0)
+        		{
+        			LOG.debug("sdn controller tries to open a second session");
+        			try {
+						session.close();
+						return;
+					} catch (IOException e) {
+						LOG.warn("problem closing unwanted session: "+e.getMessage());
 					}
+        		}
+        	}
+            SessionListener.super.sessionCreated(session);
+            try {
+                ConnectionInfo remoteConnection=new ConnectionInfo(remoteIp);
+                remoteIp=remoteConnection.toString();
+            } catch (Exception e1) {
+                LOG.debug(e1.getMessage());
+            }
 
-					if (command.equals("list")) {
-						staticCliOutputNewLine("Messages received(" + server.getStoredMessages().size() + "):");
-						for (RPCElement rpcElement : server.getStoredMessages()) {
-							staticCliOutputNewLine("#####  BEGIN message #####\n" + rpcElement.toXML() + '\n'
-									+ "#####   END message  #####");
-						}
-					} else if (command.equals("size")) {
-						staticCliOutputNewLine("Messages received(" + server.getStoredMessages().size() + "):");
+            if (Netconf2SNMPMediator.this.statusFile != null) {
+                Netconf2SNMPMediator.this.statusFile.addConnection(remoteIp);
+                try {
+                    Netconf2SNMPMediator.this.statusFile.save();
+                } catch (Exception e) {
+                    LOG.error("problem saving ne connection status to status file");
+                }
+            }
+        }
 
-					} else if (command.equals("quit")) {
-						staticCliOutputNewLine("Stop server");
-						server.stopServer();
-						break;
-					} else if (command.equals("info")) {
-						staticCliOutputNewLine("Version: " + VERSION + " Port: " + port + " File: " + xmlFilename);
-					} else if (command.equals("status")) {
-						staticCliOutputNewLine("Status: not implemented");
-					} else if (command.startsWith("n")) {
-						String notifyCommand = command.substring(1);
-						staticCliOutputNewLine("Notification: " + notifyCommand);
-						server.notify(notifyCommand);
-					} else if (command.length() == 0) {
-					} else {
-						staticCliOutputNewLine("NETCONF Simulator V3.0");
-						staticCliOutputNewLine("Available commands: status, quit, info, list, size, nZZ, nl, nx");
-						staticCliOutputNewLine("\tnx: list internal XML doc tree");
-						staticCliOutputNewLine("\tnl: list available notifications");
-						staticCliOutputNewLine("\tnZZ: send notification with number ZZ");
-					}
-				}
-			} else {
-				while (true)
-					Thread.sleep(1000);
+        @Override
+        public void sessionClosed(Session session) {
 
-			}
-		} catch (SAXException e) {
-			LOG.error(staticCliOutputNewLine("(..something..) failed" + e.getMessage()));
-		} catch (ParserConfigurationException e) {
-			LOG.error(staticCliOutputNewLine("(..something..) failed" + e.getMessage()));
-		} catch (TransformerConfigurationException e) {
-			LOG.error("(..something..) failed", e);
-		} catch (ServerException e) {
-			LOG.error("(..something..) failed", e);
-		} catch (XPathExpressionException e) {
-			LOG.error("(..something..) failed", e);
-		} catch (IOException e) {
-			LOG.error("(..something..) failed", e);
-		} catch (InterruptedException e) {
-			LOG.error("(..something..) failed", e);
-		}
-		cfg.deletePIDFile();
-		staticCliOutputNewLine("Exiting");
-		System.exit(0);
-	}
+            String remoteIp=session.getIoSession().getRemoteAddress().toString();
+            try {
+                ConnectionInfo remoteConnection=new ConnectionInfo(remoteIp);
+                remoteIp=remoteConnection.toString();
+            } catch (Exception e1) {
+                LOG.debug(e1.getMessage());
+            }
+            if (Netconf2SNMPMediator.this.statusFile != null) {
+                Netconf2SNMPMediator.this.statusFile.removeConnection(remoteIp);
+                try {
+                    Netconf2SNMPMediator.this.statusFile.save();
+                } catch (Exception e) {
+                    LOG.error("problem saving ne connection status to status file");
+                }
+            }
+        };
+    };
 
-	@Override
-	public String cliOutput(String msg) {
-		return staticCliOutputNewLine(msg);
-	}
 
-	static String staticCliOutputNewLine(String msg) {
-		if(CLIMODE)
-			System.out.println(msg);
-		else
-			LOG.info(msg);
-		return msg;
-	}
 
-	static String staticCliOutput(String msg) {
-		if(CLIMODE)
-			System.out.print(msg);
-		else
-			LOG.info(msg);
-		return msg;
-	}
+    /**
+     * Initializes the server
+     *
+     * @param host
+     *            host name (use null to listen in all interfaces)
+     * @param listeningPort
+     *            where the server will listen for SSH connections
+     * @param sne
+     *            with NetworkElement model
+     * @param devNum
+     *            number of interface card
+     *
+     */
+    public void initializeServer(String host, int listeningPort, Netconf2SNMPNetworkElement sne, int devNum, MonitoredNetworkElement mne) {
+    	this._loadPlugins(sne,this.configFile);
+        this._plgPreInit();
+        String username = this.configFile.getNetconfUsername();
+        String passwd = this.configFile.getNetconfPassword();
+        LOG.info(Program.staticCliOutputNewLine("Configuring mediator ..."));
+        //LOG.info("version: "+getVersion()+ " nexml: "+ sne.getXmlFilename()+ "(v: "+sne.getXmlVersion()+")");
+        sshd = SshServer.setUpDefaultServer();
+         if (sshd == null) {
+            LOG.fatal(Program.staticCliOutputNewLine("No SSH Server ... exit"));
+            System.exit(1);
+        } else {
+        	PropertyResolverUtils.updateProperty(sshd, FactoryManager.IDLE_TIMEOUT, SSH_TIMEOUT_MS);     	
+        	//disable ssh rekeying
+        	PropertyResolverUtils.updateProperty(sshd, FactoryManager.REKEY_BLOCKS_LIMIT, -1);
+        	PropertyResolverUtils.updateProperty(sshd, FactoryManager.REKEY_BYTES_LIMIT, -1);
+        	PropertyResolverUtils.updateProperty(sshd, FactoryManager.REKEY_PACKETS_LIMIT, -1);
+        	PropertyResolverUtils.updateProperty(sshd, FactoryManager.REKEY_TIME_LIMIT, -1);
+        	
+        	sshd.setHost(host);
+            sshd.setPort(listeningPort);
+            LOG.info(Program.staticCliOutputNewLine("Host: '" + host + "', listenig port: " + listeningPort));
+            sshd.setPasswordAuthenticator((username!=null || passwd!=null || username=="" || passwd=="")?new AlwaysTruePasswordAuthenticator():new UserPasswordAuthenticator(username,passwd));
+            sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider(new File(this.configFile.getHostKeyFilename()).toPath()));
+
+            List<NamedFactory<Command>> subsystemFactories = new ArrayList<>();
+            subsystemFactories
+                    .add(Netconf2SNMPFactory.createFactory(this, this, this, sne, mediatorConnectionListener, this.console));
+            sshd.setSubsystemFactories(subsystemFactories);
+            this.deviceConnectionMonitor=new DeviceConnectionMonitor(mne,null,this.configFile.getAlternateivePingPort(),this.mediatorConnectionListener);
+            LOG.info(Program.staticCliOutputNewLine("Mediator configured."));
+        }
+    }
+
+    @Override
+    public void defineBehaviour(Behaviour behaviour) {
+        if (behaviours == null) {
+            behaviours = new ArrayList<>();
+        }
+        synchronized (behaviours) {
+            behaviours.add(behaviour);
+        }
+    }
+
+    @Override
+    public List<Behaviour> getBehaviours() {
+        if (behaviours == null) {
+            return null;
+        }
+        synchronized (behaviours) {
+            return behaviours;
+        }
+    }
+
+    public void startServer() throws ServerException {
+        LOG.info(Program.staticCliOutputNewLine("Starting server..."));
+        sshd.addSessionListener(this.sshSessionListener);
+        try {
+            sshd.start();
+        } catch (IOException e) {
+            LOG.error(Program.staticCliOutputNewLine("Error starting server!" + e.getMessage()));
+            throw new ServerException("Error starting server", e);
+        }
+        this.mIsRunning=true;
+        LOG.info(Program.staticCliOutputNewLine("Server started."));
+        this._plgPostInit();
+    }
+
+    public void stopServer() throws ServerException {
+        Program.staticCliOutputNewLine("Stopping server...");
+        this._plgClose();
+        sshd.removeSessionListener(this.sshSessionListener);
+        try {
+            sshd.stop();
+            if(deviceConnectionMonitor!=null) {
+                deviceConnectionMonitor.waitAndInterruptThreads();
+            }
+
+            stopSNMPThreads();
+        } catch (IOException e) {
+            Program.staticCliOutputNewLine("Error stopping server!" + e);
+            throw new ServerException("Error stopping server", e);
+        }
+        this.mIsRunning=false;
+        Program.clearPID();
+        Program.staticCliOutputNewLine("Server stopped.");
+    }
+
+    private void stopSNMPThreads() {
+        if(SNMPDevicePollingThread.isRunning()) {
+            SNMPDevicePollingThread.stopThread();
+        }
+    }
+
+    @Override
+    public void storeMessage(RPCElement message) {
+        if (messages != null) {
+            synchronized (messages) {
+                LOG.info("Storing message " + message.getMessageId());
+                messages.add(message);
+            }
+        }
+    }
+
+    @Override
+    public List<RPCElement> getStoredMessages() {
+        synchronized (messages) {
+            return Collections.unmodifiableList(messages);
+        }
+    }
+
+
+    @Override
+    public void addNetconfNotifyExecutor(BaseNetconfController newNetconfProcessor) {
+        this.netconfNotifyExecutorList.add(newNetconfProcessor);
+
+    }
+
+    @Override
+    public void removeNetconfNotifyExecutor(BaseNetconfController netconfProcessor) {
+        this.netconfNotifyExecutorList.remove(netconfProcessor);
+    }
+
+    public void notify(String command) {
+        if (this.netconfNotifyExecutorList.size() > 0) {
+            for (NetconfNotifyExecutor e : this.netconfNotifyExecutorList) {
+                if (e != null) {
+                    e.notify(command);
+                }
+            }
+
+        } else {
+            System.out.println("No notifier registered.");
+        }
+
+    }
+
+    public static String getVersion()
+    {
+    	return getVersion(null,null);
+    }
+
+    public static String getVersion(Class c,String propPath) {
+        String version = null;
+
+        Class<Netconf2SNMPMediator> cls = c==null?Netconf2SNMPMediator.class:c;
+        String pp=propPath==null?"/META-INF/maven/com.technologies.highstreet/netconf2snmpmediator/pom.properties":propPath;
+        // try to load from maven properties first
+        try {
+            Properties p = new Properties();
+            InputStream is = cls.getResourceAsStream(pp);
+            if (is != null) {
+                p.load(is);
+                version = p.getProperty("version", "unknown");
+                is.close();
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+
+        // fallback to using Java API
+        if (version == null) {
+            Package aPackage = cls.getPackage();
+            if (aPackage != null) {
+                version = aPackage.getImplementationVersion();
+                if (version == null) {
+                    version = aPackage.getSpecificationVersion();
+                }
+            }
+        }
+
+        if (version == null) {
+            // we could not compute the version so use a blank
+            version = "";
+        }
+
+        return version;
+        // return this.getClass().getPackage().getImplementationVersion();
+    }
+
+  
+
+
+    @Override
+    public boolean onTrapReceived(SnmpKeyValuePairList trap) {
+        return this._plgOnTrapReceived(trap);
+    }
+
+    @Override
+    public void onPreRequest(String messageId, NetconfTagList tags, NodeEditConfigCollection nodes) {
+        this._plgPreRequest(messageId, tags, nodes);
+    }
+
+    @Override
+    public void onPostRequest(String messageId, NetconfTagList tags, NodeEditConfigCollection nodes) {
+        this._plgPostRequest(messageId, tags, nodes);
+    }
+
+    @Override
+    public void onPreEditRequest(String messageId, NetconfTagList tags, Document sourceMessage) {
+        this._plgPreEditRequest(messageId, tags, sourceMessage);
+    }
+
+    @Override
+    public void onPostEditRequest(String messageId, NetconfTagList tags, Document sourceMessage) {
+        this._plgPostEditRequest(messageId, tags, sourceMessage);
+    }
+
+    public void onDeviceConnectionStatusChanged(int before,int now)
+    {
+        this._plgOnDeviceConnectionStatusChanged(before,now);
+    }
+
+
+
+
 
 }

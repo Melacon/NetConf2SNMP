@@ -1,6 +1,6 @@
 package com.technologies.highstreet.mediatorserver.data;
 
-public class MediatorConfigCollection extends JSONableCollection<MediatorConfig>{
+public class MediatorConfigCollection extends JSONableCollection<ServerSideMediatorConfig>{
 	
 	/**
 	 * 

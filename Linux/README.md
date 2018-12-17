@@ -7,7 +7,7 @@ This represents the Filesystem on a Ubuntu Server 16.04 with all files and scrip
 
 ### Prerequisites
 
-The description bases on the environment: Ubuntu 16.04, Java 1.8, git 2.7.4, curl , jq
+The description bases on the environment: Ubuntu 16.04, Java 1.8, git 2.7.4, curl
 
 ### Installation instructions
 
@@ -16,30 +16,15 @@ The description bases on the environment: Ubuntu 16.04, Java 1.8, git 2.7.4, cur
 adduser mediators
 ```
 
-* define a folder as home (this will be your working directory)
+* define a folder as $NETCONF2SNMP_HOME
 
 ```
-e.g. /opt/snmp/
+echo "NETCONF2SNMP_HOME=/opt/snmp/" >> /etc/environment
 ```
 
-* create a folder source
-```
-mkdir /opt/snmp/source
-```
 * checkout repo folder to this folder
-```
-cd /opt/snmp/source
-git clone <repo>.git
-```
-* copy the files and folders that the structure now looks like:
-```
-/opt/snmp/bin
-/opt/snmp/nemodel
-/opt/snmp/source
-/opt/snmp/yang
-```
 
-* add MediatorServer instance to systemd
+* add MediatorServer.jar to systemd
 * create new file: /etc/systemd/system/mediatorserver.service
 
 ```
@@ -67,17 +52,5 @@ systemctl daemon-reload
 systemctl enable mediatorserver.service
 ```
 
-* create crons
-```
-crontab -e
-```
-```
-*/2 * * * * /bin/bash /opt/snmp/bin/firewall.sh >> /var/log/firewall.log
-*/2 * * * * /bin/bash /opt/snmp/bin/clean_all.sh > /dev/null 2>&1
 
-```
 
-* start the server
-```
-./bin/control.sh start
-```

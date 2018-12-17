@@ -1,16 +1,16 @@
 package com.technologies.highstreet.netconf.server.transport;
 
-import com.technologies.highstreet.netconf.server.streamprocessing.NetconfIncommingMessageRepresentation;
-import net.i2cat.netconf.messageQueue.MessageQueue;
-
-import net.i2cat.netconf.transport.TransportContentParser;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 import org.xml.sax.ext.DefaultHandler2;
+
+import com.technologies.highstreet.netconf.server.streamprocessing.NetconfIncommingMessageRepresentation;
+
+import net.i2cat.netconf.messageQueue.MessageQueue;
+import net.i2cat.netconf.transport.TransportContentParser;
 
 /**
  * Transport content parser for Netconf servers based on {@link TransportContentParser}

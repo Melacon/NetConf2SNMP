@@ -4,9 +4,16 @@
   <artifactId>deviceslib</artifactId>
   <version>0.1.0</version>
   <name>DevicesLib</name>
+  <dependencies>
+    <dependency>
+    		<groupId>org.json</groupId>
+    		<artifactId>json</artifactId>
+    		<version>20170516</version>
+		</dependency>
+  </dependencies>
  	<build>
  		<plugins>
- 			
+
  		</plugins>
  	</build>
 </project>

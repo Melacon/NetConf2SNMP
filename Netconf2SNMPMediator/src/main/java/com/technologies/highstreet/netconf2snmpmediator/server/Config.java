@@ -13,39 +13,27 @@ import org.snmp4j.mp.SnmpConstants;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import com.technologies.highstreet.deviceslib.data.SNMPDeviceType;
+import com.technologies.highstreet.netconf2snmpmediator.server.networkelement.SimulatorNetworkElement;
 
 public class Config {
 
 	private static final Logger LOG = LoggerFactory.getLogger(Config.class);
 
-	public static final int USAGEMODE_ONEMEDIATORONEDOCKER = 1; //need a trapsPortMapper
-    public static final int USAGEMODE_STANDALONEJAR = 2;    //no trapsPortMapper is needed
-
-    public static final int DEFAULT_LATENCY = 1500;
+	public static final int DEFAULT_LATENCY = 1500;
     public static final int SNMPPING_INTERVAL = 30*1000;	//30 seconds
     public int DEVICEPING_TIMEOUT = 2000;
-    /*basic usage settings */
-    public static final int UsageMode=USAGEMODE_STANDALONEJAR;
 
     /* basic snmp settings */
     public int SNMPRequestLatency = DEFAULT_LATENCY;  //in ms
     public final int SNMPRequestRetries = 1;
     public int SNMPVersion = SnmpConstants.version2c;
-    public SNMPDeviceType SNMPDeviceClass = SNMPDeviceType.SIMULATOR;
-
-    /* PortMapper Settings (deprecated)*/
-    public String PortMapperIP = "192.168.11.44";
-    public int PortMapperPort  = 1234;
-    public boolean PortMapperMaster=false;
-    public final int PortMapperLatency = 10; //in ms
-    public final int PortMapperWatchdogInterval = 5000;//in ms
+    public long SNMPDeviceClass = SimulatorNetworkElement.INFOS.getId();
 
     /* Mediator Settings */
     public int MediatorTrapsPort = 10162;
     public String MediatorIp="";
     public int MediatorDefaultNetworkInterfaceNum=0;
-    public String MediatorDeviceIp="5.17.126.182";
+    public String MediatorDeviceIp="";
 	private boolean sendConnectionStateContinously=false;
 	private boolean updateProblemTimestamps = true;
 
@@ -61,16 +49,6 @@ public class Config {
     	if(mObj==null)
     		mObj=new Config();
     	return mObj;
-    }
-
-    public String GetTable()
-    {
-        return String.format("PortMapper:\t%s:%d(%s)\nMediator:\t%s:%d", this.PortMapperIP,this.PortMapperPort,this.PortMapperMaster?"m":"",this.MediatorIp,-1);
-    }
-
-
-    public static boolean IsPortMapperNeeded() {
-        return Config.UsageMode==Config.USAGEMODE_ONEMEDIATORONEDOCKER;
     }
 
     public boolean tryLoad(String filename)
@@ -141,5 +119,13 @@ public class Config {
 
 	public boolean updateProblemTimestamps() {
 		return updateProblemTimestamps;
+	}
+
+	public static Config TestConfig() {
+		Config x=getInstance();
+		x.LogLevel = Level.DEBUG;
+		x.DEVICEPING_TIMEOUT = SNMPPING_INTERVAL;
+		x.SNMPRequestLatency = DEFAULT_LATENCY;
+		return x;
 	}
 }

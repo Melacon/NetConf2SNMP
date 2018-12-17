@@ -6,14 +6,16 @@ import java.io.OutputStream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.sshd.server.ExitCallback;
-import com.technologies.highstreet.netconf.server.basetypes.Console;
+
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.Console;
+import com.technologies.highstreet.mediatorlib.netconf.server.networkelement.NetworkElement;
 import com.technologies.highstreet.netconf.server.basetypes.MessageStore;
 import com.technologies.highstreet.netconf.server.basetypes.UserCommand;
-import com.technologies.highstreet.netconf.server.networkelement.NetworkElement;
 import com.technologies.highstreet.netconf.server.streamprocessing.NetconfMessageProcessorThread;
 import com.technologies.highstreet.netconf.server.streamprocessing.NetconfStreamCodecThread;
 import com.technologies.highstreet.netconf.server.types.NetconfSessionStatus;
 import com.technologies.highstreet.netconf.server.types.NetconfSessionStatusHolder;
+
 import net.i2cat.netconf.messageQueue.MessageQueue;
 
 /**
@@ -100,7 +102,8 @@ public class NetconfController implements BaseNetconfController {
     private void waitAndInterruptThreads() {
         // wait for thread
         try {
-            messageProcessorThread.join(2000);
+        	if(messageProcessorThread!=null)
+        		messageProcessorThread.join(2000);
         } catch (InterruptedException e) {
             log.error("Error waiting for thread end", e);
         }

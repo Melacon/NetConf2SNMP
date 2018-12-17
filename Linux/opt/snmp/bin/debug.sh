@@ -10,7 +10,7 @@ create_file(){
   FN=$1
   HOST=$2
   PORT=$3
-  echo "JAVA_JMXCONFIG=-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -Djava.rmi.server.hostname="$HOST" -Dcom.sun.management.jmxremote.port="$PORT > $FN
+  echo 'JAVA_JMXCONFIG="-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -Djava.rmi.server.hostname='$HOST' -Dcom.sun.management.jmxremote.port='$PORT'"' > $FN
 }
 
 do_start(){

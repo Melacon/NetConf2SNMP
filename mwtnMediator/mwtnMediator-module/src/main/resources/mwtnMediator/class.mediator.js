@@ -1,10 +1,52 @@
-function MediatorConfig(obj) {
+function DeviceInfo(obj){
+	if(obj !== undefined) {
+		this.Id = obj.id;
+		this.Vendor = obj.vendor;
+		this.Device = obj.device;
+		this.Version = obj.version;
+		this.Xml = obj.xml;
+	}
+	else
+		{
+		this.Id = 0;
+		this.Vendor = "unknown";
+		this.Device = "unknown";
+		this.Version = "0.0.0";
+		this.Xml = "unknown.xml";		
+		}
+
+}
+DeviceInfo.prototype.GetFullName = function()
+{
+	return this.Vendor + " "+ this.Device+" ("+this.Version+")";
+}
+function Version(str){
+	var x=str.split('.');
+	this.Main = parseInt(x[0]);
+	this.Major = parseInt(x[1]);;
+	this.Minor = parseInt(x[2]);;
+}
+Version.prototype.isBiggerThan = function(s)
+{
+	if(typeof(s)==='string')
+		s=new Version(s);
+	if(this.Main>s.Main)
+		return true;
+	if(this.Major>s.Major)
+		return true;
+	if(this.Minor>s.Minor)
+		return true;
+	return false;
+}
+function MediatorConfig(obj,server) {
 	if (obj !== undefined) {
 		this.Name = obj.Name;
 		this.DeviceType = obj.DeviceType;
 		this.DeviceIp = obj.DeviceIp;
+		this.DevicePort = 'DevicePort' in obj?obj.DevicePort:161;
 		this.TrapsPort = obj.TrapPort;
 		this.IsNetConfConnected = obj.IsNCConnected;
+		this.NetconfConnections = 'ncconnections' in obj?obj.ncconnections:[];
 		this.IsNetworkElementConnected = obj.IsNeConnected;
 		this.NeModel = obj.NeXMLFile;
 		this.NetconfPort = obj.NcPort;
@@ -17,8 +59,10 @@ function MediatorConfig(obj) {
 		this.Name ="";
 		this.DeviceType = -1;
 		this.DeviceIp = "";
+		this.DevicePort = 161;
 		this.TrapsPort = 0;
 		this.IsNetConfConnected = false;
+		this.NetconfConnections=[];
 		this.IsNetworkElementConnected = false;
 		this.NeModel = "";
 		this.NetconfPort = 0;
@@ -28,19 +72,23 @@ function MediatorConfig(obj) {
 		this.FirewallRuleActive = false;
 		this.OpenDaylightConfigs=[];
 	}
-	this.DeviceTypeString = this.getDeviceTypeString();
-	this.ConnectionStatus = {Netconf:this.IsNetConfConnected,NetworkElement:this.IsNetworkElementConnected}
+	this.DeviceTypeString = server.getDeviceTypeString(this.DeviceType);
+	var n=this.NetconfConnections===undefined?"0":this.NetconfConnections.length;
+	var o=this.OpenDaylightConfigs===undefined?"0":this.OpenDaylightConfigs.length;
+	this.ConnectionStatus = {Netconf:this.IsNetConfConnected,NetworkElement:this.IsNetworkElementConnected,NetconfConnetionsString:""+n+"/"+o}
 
 }
-MediatorConfig.prototype.refreshData = function(obj)
+MediatorConfig.prototype.refreshData = function(obj,server)
 {
 	if(obj!==undefined)
 	{
 		//this.Name = obj.Name;
 		this.DeviceType = obj.DeviceType;
 		this.DeviceIp = obj.DeviceIp;
+		this.DevicePort = 'DevicePort' in obj?obj.DevicePort:161;
 		this.TrapsPort = obj.TrapPort;
 		this.IsNetConfConnected = obj.IsNCConnected;
+		this.NetconfConnections = 'ncconnections' in obj?obj.ncconnections:[];
 		this.IsNetworkElementConnected = obj.IsNeConnected;
 		this.NeModel = obj.NeXMLFile;
 		this.NetconfPort = obj.NcPort;
@@ -50,27 +98,35 @@ MediatorConfig.prototype.refreshData = function(obj)
 		this.FirewallRuleActive = obj.fwactive;
 		this.OpenDaylightConfigs = obj.ODLConfig;
 	}
-	this.DeviceTypeString = this.getDeviceTypeString();
-	this.ConnectionStatus = {Netconf:this.IsNetConfConnected,NetworkElement:this.IsNetworkElementConnected}
+	this.DeviceTypeString = server.getDeviceTypeString(this.DeviceType);
+	var n=this.NetconfConnections===undefined?"0":this.NetconfConnections.length;
+	var o=this.OpenDaylightConfigs===undefined?"0":this.OpenDaylightConfigs.length;
+	this.ConnectionStatus = {Netconf:this.IsNetConfConnected,NetworkElement:this.IsNetworkElementConnected,NetconfConnetionsString:""+n+"/"+o}
 
 }
-MediatorConfig.prototype.getDeviceTypeString = function()
+MediatorConfig.prototype.RefreshDeviceName = function(server)
 {
-	var i;
-	for(i=0;i<MediatorConfig.DeviceTypes.length;i++)
-	{
-		if(MediatorConfig.DeviceTypes[i].Value==this.DeviceType)
-			return MediatorConfig.DeviceTypes[i].Name;
-	}
-	return "unknown";
+	this.DeviceTypeString = server.getDeviceTypeString(this.DeviceType);
 }
-MediatorConfig.DEVICETYPE_SIMULATOR =0;
-MediatorConfig.DEVICETYPE_EXAMPLE_DEVICE = 1;
 
-MediatorConfig.DeviceTypes=[
-{Value:MediatorConfig.DEVICETYPE_SIMULATOR,Name:"Simulator"},
-{Value:MediatorConfig.DEVICETYPE_EXAMPLE_DEVICE,Name:"ExampleDevice"}
+function MediatorConfigStatus(obj){
+	this.Status=obj.Status;
+	this.Name=obj.Name;
+};
+MediatorConfigStatus.STATUS_OKAY = 1;
+MediatorConfigStatus.STATUS_CORRUPTED = 2;
+MediatorConfigStatus.STATUS_LOCKED = 3;
+MediatorConfigStatus.STATUS_REPAIRED = 4;
+MediatorConfigStatus.StatusTypes=[
+	{Value:MediatorConfigStatus.STATUS_OKAY,Name:"Okay"},
+	{Value:MediatorConfigStatus.STATUS_CORRUPTED,Name:"Corrupted"},
+	{Value:MediatorConfigStatus.STATUS_LOCKED,Name:"Locked"},
+	{Value:MediatorConfigStatus.STATUS_REPAIRED,Name:"Repaired"}
 ];
+
+MediatorConfig.DefaultDeviceInfos=[{
+	id:0,vendor:"OpenSource",device:"Simulator",version:"1.0.0",xml:"DVM_MWCore12_BasicAir.xml"
+}];
 MediatorConfig.prototype.IsRunning = function() {
 	return this.PID > 0;
 }
@@ -82,7 +138,7 @@ MediatorConfig.prototype.TestParams = function() {
 	if(inValidName.test(this.Name))
 		throw "Name cannot have whitespaces";
 	// DeviceType: int from 0 to ...
-	if(this.DeviceType<=0 || this.DeviceType>MediatorConfig.DEVICETYPE_ELVA_1)
+	if(this.DeviceType<0 || this.DeviceType>MediatorConfig.DeviceTypes[MediatorConfig.DeviceTypes.length-1].Value)
 		throw "DeviceType is not set";
 	// DeviceIp: valid IP-Address
 	var validIpTest =/^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$|^(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])$|^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$/;
@@ -117,6 +173,7 @@ function JavaMemParam(str)
 {
 	if(str!==undefined)
 	{
+
 
 	}
 }
@@ -157,14 +214,65 @@ function MediatorServer(url) {
 	this._root = this._root + "/";
 	this._mediatorConfigs = [];
 	this._neXMLFilenames = undefined;
-	this.defaultODLConfig = {Server:"localhost.fritz.box",Port:8181,User:"admin",Password:"admin"};
-
+	this._supportedDevices = [];
+	this.defaultODLConfig = {Server:location.hostname,Port:8181,User:"admin",Password:"admin"};
+	this._serverVersion=undefined;
+	this._mediatorVersion=undefined;
+	this._autoDeviceSupported=false;
 }
 MediatorServer.prototype.getConfigs = function(){return this._mediatorConfigs;}
 
 MediatorServer.prototype.SetDefaultODLConfig = function(cfg)
 {
 	this.defaultODLConfig = cfg;
+}
+MediatorServer.prototype.GetDefaultODLConfig = function()
+{
+	return this.defaultODLConfig;
+}
+MediatorServer.prototype.GetSupportedDevices = function()
+{
+	return this._supportedDevices;
+}
+MediatorServer.prototype.SupportsAutoDevice = function()
+{
+	return this._autoDeviceSupported;
+}
+MediatorServer.prototype.GetXmlByType = function(devType)
+{
+	var xml=undefined;
+	if(this._supportedDevices!==undefined && this._supportedDevices.length>0)
+	{
+		for(var i=0;i<this._supportedDevices.length;i++)
+		{
+			if(this._supportedDevices[i].Id==devType)
+			{
+				xml=this._supportedDevices[i].Xml;
+				break;
+			}
+		}
+	}
+	return xml;
+}
+MediatorServer.prototype.getDeviceTypeString = function(deviceType)
+{
+	var i;
+	if(this._supportedDevices!==undefined)
+	{
+		for(i=0;i<this._supportedDevices.length;i++)
+		{
+			if(this._supportedDevices[i].Id==deviceType)
+				return this._supportedDevices[i].GetFullName();
+		}
+	}
+	for(i=0;i<MediatorConfig.DefaultDeviceInfos.length;i++)
+	{
+		if(MediatorConfig.DefaultDeviceInfos[i].id==deviceType)
+		{
+			return new DeviceInfo(MediatorConfig.DefaultDeviceInfos[i]).GetFullName();
+		}
+	}
+	return "unknown";
 }
 MediatorServer.prototype.refreshConfig = function(configs,cb)
 {
@@ -186,7 +294,7 @@ MediatorServer.prototype.refreshConfig = function(configs,cb)
 				if(this._mediatorConfigs[j].Name==configs[i].Name)
 				{
 					//refresh data
-					this._mediatorConfigs[j].refreshData(configs[i]);
+					this._mediatorConfigs[j].refreshData(configs[i],mediatorServer);
 					changed.push(configs[i]);
 					break;
 				}
@@ -199,14 +307,66 @@ MediatorServer.prototype.refreshConfig = function(configs,cb)
 MediatorServer.prototype.onConfigsReceived = function(configJSONArray) {
 	this._mediatorConfigs = [];
 	for (var i = 0; i < configJSONArray.length; i++) {
-		var c = new MediatorConfig(configJSONArray[i]);
+		var c = new MediatorConfig(configJSONArray[i],this);
 		this._mediatorConfigs.push(c);
 	}
 }
 MediatorServer.prototype.onNeXMLReceived = function(neXMLFilenamesArray) {
 	this._neXMLFilenames = neXMLFilenamesArray;
 }
-
+MediatorServer.prototype.onSupportedDevicesReceived = function(devicesArray){
+	this._supportedDevices = [];
+	if(devicesArray!==undefined)
+	{
+		for(var i=0;i<devicesArray.length;i++)
+		this._supportedDevices.push(new DeviceInfo(devicesArray[i]));
+	}
+}
+MediatorServer.prototype.LoadSupportedDevices = function(cb,cbError) {
+	if(this._supportedDevices!==undefined && this._supportedDevices.length>0)
+	{
+		if(cb!==undefined)
+			cb(this._supportedDevices);
+	}
+	else
+	{
+		if(this._serverVersion!==undefined)
+		{
+			if(this._serverVersion.isBiggerThan("1.0.4"))
+			{
+				var _self = this;
+				this.post("getdevices", function(response) {
+					if (response.code == 1) {
+						_self.onSupportedDevicesReceived(response.data);
+						this._autoDeviceSupported=true;
+						if (cb !== undefined)
+							cb(_self._neXMLFilenames);
+					} else
+					{
+						_self.log(response.data);
+						if(cbError!==undefined)
+							cbError(response.data);
+					}
+				},function(err){
+					if(cbError!==undefined)
+						cbError(err);
+				});
+			}
+			else
+			{
+				this.onSupportedDevicesReceived(MediatorConfig.DefaultDeviceInfos);
+				this._autoDeviceSupported=false;
+			}
+		}
+		else
+		{
+			var _self = this;
+			this.LoadVersion(function(){
+				_self.LoadSupportedDevices(cb,cbError);
+			});
+		}
+	}
+}
 MediatorServer.prototype.LoadNetworkElementXMLFiles = function(cb,cbError) {
 	var _self = this;
 	this.post("getnemodels", function(response) {
@@ -215,10 +375,64 @@ MediatorServer.prototype.LoadNetworkElementXMLFiles = function(cb,cbError) {
 			if (cb !== undefined)
 				cb(_self._neXMLFilenames);
 		} else
+		{
 			_self.log(response.data);
 			if(cbError!==undefined)
 				cbError(response.data);
-
+		}
+	},function(err){
+		if(cbError!==undefined)
+			cbError(err);
+	});
+}
+MediatorServer.prototype.LoadLogs = function(name,cb,cbError)
+{
+	var _self = this;
+	this.post("getlog&name="+name,function(response){
+		if (response.code == 1) {
+			if (cb !== undefined)
+				cb(response.data);
+		} else
+		{	_self.log(response.data);
+			if(cbError!==undefined)
+				cbError(response.data);
+		}
+	},function(err){
+		if(cbError!==undefined)
+			cbError(err);
+	});
+}
+MediatorServer.prototype.LoadAvailableNCPorts = function(cb,cbError)
+{
+	var _self = this;
+	this.post("getncports",function(response){
+		if (response.code == 1) {
+			if (cb !== undefined)
+				cb(response.data);
+		} else
+		{	_self.log(response.data);
+			if(cbError!==undefined)
+				cbError(response.data);
+		}
+	},function(err){
+		if(cbError!==undefined)
+			cbError(err);
+	});
+}
+MediatorServer.prototype.LoadAvailableSnmpPorts = function(cb,cbError)
+{
+	var _self = this;
+	this.post("getsnmpports",function(response){
+		if (response.code == 1) {
+			if (cb !== undefined)
+				cb(response.data);
+		}
+		else
+		{
+			_self.log(response.data);
+			if(cbError!==undefined)
+				cbError(response.data);
+		}
 	},function(err){
 		if(cbError!==undefined)
 			cbError(err);
@@ -293,11 +507,49 @@ MediatorServer.prototype.LoadConfigs = function(cb,cbError) {
 			cbError(err);
 	});
 }
+MediatorServer.prototype.Repair = function(cb,cbError)
+{
+	var _self = this;
+	this.post("repair", function(response) {
+		if (response.code == 1) {
+			if (cb !== undefined)
+				cb(response.data);
+		} else {
+			_self.log(response.data);
+			if(cbError!==undefined)
+				cbError(response.data);
+		}
+	},function(err){
+		if(cbError!==undefined)
+			cbError(err);
+	});
+}
+MediatorServer.prototype.LoadVersion = function(cb,cbError)
+{
+	var _self = this;
+	this.post("version", function(response) {
+		if (response.code == 1) {
+			_self.onVersionsReceived(response.data);
+			if (cb !== undefined)
+				cb(response.data);
+		} else {
+			_self.log(response.data);
+		}
+
+	},function(err){
+		if(cbError!==undefined)
+			cbError(err);
+	});
+}
+MediatorServer.prototype.onVersionsReceived = function(versions){
+	this._serverVersion = new Version(versions.server);
+	this._mediatorVersion = new Version(versions.mediator);
+}
 /*
  * name: <String> deviceType: <int> deviceip: <Ipv4-String> trapsPort:<int>
  * nexml:<String> ncport:<int> cb: callback-function
  */
-MediatorServer.prototype.CreateMediator = function(name,devicetype,deviceip,trapsPort,nexml,ncport, cb, cbError) {
+MediatorServer.prototype.CreateMediator = function(name,devicetype,deviceip,deviceport,trapsPort,nexml,ncport, cb, cbError) {
 
 	var obj;
 	try
@@ -306,10 +558,11 @@ MediatorServer.prototype.CreateMediator = function(name,devicetype,deviceip,trap
 			Name:name,
 			DeviceType:devicetype,
 			DeviceIp:deviceip,
+			DevicePort:deviceport,
 			TrapPort:trapsPort,
 			NeXMLFile:nexml,
 			NcPort:ncport
-		});
+		},this);
 		obj.TestParams();
 	}
 	catch(e)
@@ -322,6 +575,7 @@ MediatorServer.prototype.CreateMediator = function(name,devicetype,deviceip,trap
 			Name : obj.Name,
 			DeviceType : obj.DeviceType,
 			DeviceIp : obj.DeviceIp,
+			DevicePort : obj.DevicePort,
 			TrapPort : obj.TrapsPort,
 			NeXMLFile : obj.NeModel,
 			NcPort : obj.NetconfPort,
@@ -381,6 +635,7 @@ MediatorServer.prototype.ClearLock = function(name, cb, cbError) {
 			cbError(err);
 	});
 }
+
 /*
  * do post request
  *
@@ -452,5 +707,5 @@ MediatorServer.prototype._error = function(message) {
 	console.log(message);
 }
 MediatorServer.prototype.log = function(message) {
-	console.log(message);
+//	console.log(message);
 }

@@ -13,7 +13,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringReader;
-import net.i2cat.netconf.messageQueue.MessageQueue;
+
+import javax.swing.plaf.SliderUI;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -22,10 +23,13 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 import org.xml.sax.helpers.XMLReaderFactory;
+
 import com.technologies.highstreet.netconf.server.transport.ServerTransportContentParser;
 import com.technologies.highstreet.netconf.server.types.NetconfSender;
 import com.technologies.highstreet.netconf.server.types.NetconfSessionStatus;
 import com.technologies.highstreet.netconf.server.types.NetconfSessionStatusHolder;
+
+import net.i2cat.netconf.messageQueue.MessageQueue;
 
 public class NetconfStreamCodecThread implements Runnable, NetconfSender {
 
@@ -33,6 +37,8 @@ public class NetconfStreamCodecThread implements Runnable, NetconfSender {
 
     private static final String                END_CHAR_SEQUENCE    = "]]>]]>"; //EOM old
     //private static final String                CHUNK                = "\n#";    //Chunk indicator
+
+	private static final boolean CLOSE_STREAM_ON_ERROR = true;
 
     private final ExitCallback      callback;
     private final InputStream       in;
@@ -46,6 +52,8 @@ public class NetconfStreamCodecThread implements Runnable, NetconfSender {
     private final NetconfSessionStatusHolder status;
     private int r;
 
+	private String remoteIp;
+
 
     public NetconfStreamCodecThread(InputStream in, OutputStream out, ExitCallback callback,
             NetconfSessionStatusHolder status, MessageQueue messageQueue) {
@@ -54,7 +62,6 @@ public class NetconfStreamCodecThread implements Runnable, NetconfSender {
         this.out = out;
         this.status = status;
         this.callback = callback;
-
         this.xmlParser = new ServerTransportContentParser();
         this.xmlParser.setMessageQueue(messageQueue);
 
@@ -94,14 +101,17 @@ public class NetconfStreamCodecThread implements Runnable, NetconfSender {
                 while ( true ) {
                     r = isr.read();
                     if (r == -1) {
-                        break;
+                    {
+                    	log.trace("stop reading. current message: "+message.toString());
+                    	break;
+                    }
                     } else {                         //Add char to message
                         char c =(char)r;
                         //log.debug(getTS()+" Char: "+c);
                         if (message.length() == 0) {
                             log.debug(" Start reading new message "+messageNo);
                         }
-                        //log.debug("Char: "+r+" "+c);
+                        log.trace("appending char: "+r+" "+c);
                         message.append(c);
 
 
@@ -124,12 +134,17 @@ public class NetconfStreamCodecThread implements Runnable, NetconfSender {
                  try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {
+                	log.warn("problem with threadsleep: "+e.getMessage());
                 }
             }
         } catch (Exception e) {
             log.error("Exception caught in Netconf subsystem", e);
         } finally {
-            callback.onExit(0);
+        	if(CLOSE_STREAM_ON_ERROR)
+        	{
+        		status.change(NetconfSessionStatus.SESSION_CLOSED);
+        		callback.onExit(0);		
+        	}
         }
     }
 
@@ -155,11 +170,22 @@ public class NetconfStreamCodecThread implements Runnable, NetconfSender {
 
     @Override
     synchronized public void send(String xmlMessage) throws IOException {
-        log.debug("Sending message:\n" + xmlMessage);
+        log.trace("Sending message:\n" + xmlMessage);
         out.write(xmlMessage.getBytes("UTF-8"));
         // send final sequence
         out.write(END_CHAR_SEQUENCE.getBytes("UTF-8"));
         out.flush();
     }
+
+	public String getRemoteIp() {
+		return this.remoteIp;
+	}
+
+	@Override
+	public void clearOutputStream() {
+		//TODO 
+		log.debug("clear output stream currently not implemented");
+		
+	}
 
 }

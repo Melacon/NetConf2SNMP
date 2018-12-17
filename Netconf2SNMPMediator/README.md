@@ -16,7 +16,7 @@ Builds the executable jar for the Netconf2SNMPMediator
 
 Build command:
 
-```commandline 
+```commandline
 mvn clean install
 ```
 
@@ -42,7 +42,7 @@ mvn clean install
 
 The NetconfServerSimulator can be directly started from the command line. It is recommended to use screen for remote ssh/putty sessions.
 The jar parameter are:
-    1. config filename 
+    1. config filename
     2. directory (mandatory) with all yang files, used by the simulation
     3. uuid (optional) to provide an individual id
 
@@ -98,6 +98,9 @@ oid | "" | Marked as potential used for SNMP, but not yet.
 access | access="read-only" | Attribut can be read from NETCONF-get.
 access | access="read-write" | Attribute can be read by NETCONF-get and  written by NETCONF edit-config. Conversion must be bidirectional.
 access | no access attribute | Default is Read-Only
+conversion | conversion="<method\>"| Method to convert value between snmp and netconf and back
+validate | validator="<regex\>" | RegularExpression to validate the value for netconf
+
 
   Name   |   SNMP Type   |   parameter   |   Description   |
 ---------------|------|---------------------------------------------------|-------------------------------------------------------|

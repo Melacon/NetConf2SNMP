@@ -43,12 +43,14 @@ public class TestSimulatorSNMPDevice extends BaseSNMPDevice {
 		return null;
 	}
 	@Override
-	public String ConvertValueSnmp2Netconf(String oid, String value) {
-		return value;
+	public String ConvertValueSnmp2Netconf(String oid, String value, String xpath) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 	@Override
-	public String ConvertValueNetconf2Snmp(String oid, String value) {
-		return value;
+	public String ConvertValueNetconf2Snmp(String oid, String value, String xpath) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

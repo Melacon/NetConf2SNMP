@@ -31,39 +31,37 @@ public abstract class BaseSNMPDevice {
 
     public abstract String getBaseOID();
 
-    /*
+    /**
      * Indicates if SNMPTrapHost is possible to be configured via snmp set requests
      */
     public abstract boolean isSNMPTrapHostConfigureable();
-    /*
+    /**
      * Indicates if it SNMPTrapHost should be set remotely via snmp set requests
      */
     public abstract boolean doSetSNMPTrapHostConfig();
-    /*
+    /**
      * @return List of Commands for setting SNMPTrapHost Ip into device
      */
     public abstract List<SNMPKeyValuePair> getSNMPTrapHostSetCommands(String ip);
 
     public abstract String getSNMPPingRequestCommand();
 
-    public abstract String ConvertValueSnmp2Netconf(String oid, String value);
+    public abstract String ConvertValueSnmp2Netconf(String oid, String value,String xpath);
 
-    public abstract String ConvertValueNetconf2Snmp(String oid, String value);
+    public abstract String ConvertValueNetconf2Snmp(String oid, String value,String xpath);
 
-    /*
+    /**
      * Implement any DataConversions for SNMP values
      */
     abstract public String ConvertValue(String conversion, String value) throws Exception;
 
-    /*
+    /**
      * @return Array of all Available Alerts for this device
      */
     public SNMPAlert[] getAvailableAlerts()
     {
         switch(this.mType)
         {
-        case EXAMPLEDEVICE:
-            return ExampleDeviceAlerts.GetAll();
         case SIMULATOR:
             return SimulatorAlerts.GetAll();
         default:
@@ -119,15 +117,15 @@ public abstract class BaseSNMPDevice {
         {
             switch(t)
             {
+       
             case SIMULATOR:
                 return new TestSimulatorSNMPDevice();
-            case EXAMPLEDEVICE:
-                return new ExampleSNMPDevice();
-             default:
+            default:
                 return null;
             }
         }
     }
+
 
 
 

@@ -11,18 +11,22 @@
 
 package com.technologies.highstreet.netconf2snmpmediator.server.streamProcessing;
 
-import com.technologies.highstreet.netconf.server.basetypes.Console;
+import java.io.IOException;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.Console;
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.SnmpKeyValuePairList;
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.SnmpTrapNotification;
 import com.technologies.highstreet.netconf.server.basetypes.MessageStore;
 import com.technologies.highstreet.netconf.server.streamprocessing.NetconfMessageProcessorThread;
 import com.technologies.highstreet.netconf.server.types.NetconfSender;
 import com.technologies.highstreet.netconf.server.types.NetconfSessionStatusHolder;
-import com.technologies.highstreet.netconf2snmpmediator.server.basetypes.SnmpTrapList;
 import com.technologies.highstreet.netconf2snmpmediator.server.networkelement.Netconf2SNMPNetworkElement;
-import java.io.IOException;
+
 import net.i2cat.netconf.messageQueue.MessageQueue;
 import net.i2cat.netconf.rpc.RPCElement;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 public class Netconf2SNMPMessageProcessorThread extends NetconfMessageProcessorThread  {
 
@@ -34,86 +38,52 @@ public class Netconf2SNMPMessageProcessorThread extends NetconfMessageProcessorT
             MessageQueue messageQueue, MessageStore messageStore, Netconf2SNMPNetworkElement ne, Console console) {
 
         super(name, status, sender,  messageQueue,  messageStore,  ne,  console);
-        sne = ne;
+        this.sne = ne;
         this.consoleMessage("SNMP Thread created");
         log.info("SNMP Thread created");
 
     }
-	@Override
-	protected void finalize() throws Throwable {
-		super.finalize();
-		
-	}
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+
+    }
     @Override
     public boolean doMessageProcessingForSpecificMessageClass(RPCElement message) throws IOException {
 
         boolean handled = super.doMessageProcessingForSpecificMessageClass(message);
 
         if (! handled) {
-            if (message instanceof SnmpTrapList) {
-                doNotificationProcessing((SnmpTrapList)message);
+            if (message instanceof SnmpKeyValuePairList) {
+                 String msg = sne.doProcessSnmpTrapAction(((SnmpKeyValuePairList)message).get());
+                 if (msg != null) {
+                     send( msg );
+                 }
                 handled = true;
             }
         }
-        return handled;
-    }
 
-    /*
-    // The SnmpTrap is added here
-    @Override
-    public void run() {
-        while (status.less(NetconfSessionStatus.SESSION_CLOSED)) {
-
-            RPCElement message = messageQueue.blockingConsume();
-
-            if (message == null) {
-                log.debug("Received received: null");
-            } else {
-                log.debug("Message received: " + message.getClass().getSimpleName()+" "+message.toString());
-            }
-
-            // store message if necessary
-            if (messageStore != null) {
-                messageStore.storeMessage(message);
-            }
-
-            // avoid message processing when session is already closed
-            if (status.equals(NetconfSessionStatus.SESSION_CLOSED)) {
-                log.warn("Session is closing or is already closed, message will not be processed");
-                return;
-            }
-
-            // process message
-            try {
-                if (message instanceof NetconfIncommingMessageRepresentation) {
-                    doMessageProcessing((NetconfIncommingMessageRepresentation)message);
-                } else if (message instanceof UserCommand) {
-                    doNotificationProcessing((UserCommand)message);
-                } else if (message instanceof SnmpTrap) {
-                    doNotificationProcessing((SnmpTrap)message);
-                } else {
-                    log.warn("Unknown message: " + message.getClass().getSimpleName() + " " + message.toString());
-                }
-            } catch (IOException e) {
-                log.error("Error sending reply", e);
-                break;
+        
+        if (!handled) {
+            if (message instanceof SnmpTrapNotification) {
+                String netconfNotificationXml = this.sne.assembleRpcNotification( ((SnmpTrapNotification) message).toXML() );
+                log.debug("sending trap notification: "+netconfNotificationXml);
+                send(netconfNotificationXml);
+                handled = true;
             }
         }
-        log.trace("Message processor ended");
+        
+        if(!handled && message !=null) {
+			log.debug("message not handled cls="+message.getClass().getSimpleName()+" obj="+message.toString());
+		}
+        return handled;
     }
-    */
 
     /*********************************************************************
      * Private message processing
      */
 
 
-    private void doNotificationProcessing(SnmpTrapList receivedMessage) throws IOException {
 
-        String msg = sne.doProcessSnmpTrapAction(receivedMessage.get());
-        if (msg != null) {
-            send( msg );
-        }
-    }
 
 }

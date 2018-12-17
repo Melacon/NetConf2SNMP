@@ -1,8 +1,8 @@
 package com.technologies.highstreet.netconf.server.control;
 
-import com.technologies.highstreet.netconf.server.basetypes.Console;
+import com.technologies.highstreet.mediatorlib.netconf.server.basetypes.Console;
+import com.technologies.highstreet.mediatorlib.netconf.server.networkelement.NetworkElement;
 import com.technologies.highstreet.netconf.server.basetypes.MessageStore;
-import com.technologies.highstreet.netconf.server.networkelement.NetworkElement;
 
 public interface BaseNetconfController extends NetconfNotifyExecutor {
 

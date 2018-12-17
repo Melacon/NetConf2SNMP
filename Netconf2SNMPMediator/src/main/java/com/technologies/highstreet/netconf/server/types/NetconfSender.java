@@ -40,5 +40,5 @@ public interface NetconfSender {
      * @throws IOException on problems with output stream
      */
     public void send(String xmlMessage) throws IOException;
-
+    public void clearOutputStream();
 }

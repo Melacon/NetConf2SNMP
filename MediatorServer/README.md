@@ -28,28 +28,8 @@ ncrangemax=6000
 snmprangemin=10000
 snmprangemax=12000
 
-#PortRange for JMX
-jmxrangemin=6001
-jmxrangemax=7000
-
-#Log (ERROR | WARN | DEBUG | INFO | TRACE )
-loglevel=WARN
+#Log
 logfile=/var/log/mediatorserver.log
-
-#=====================================
-#global MediatorConfig
-
-#set LogLevel (ERROR | WARN | DEBUG | INFO | TRACE )
-MediatorLogLevel=DEBUG
-
-#set ping timeout in milliseconds
-MediatorDevicePingTimeout=2000
-
-#set latency for snmp requests
-MediatorSnmpLatency=2000
-
-#set java memory for mediator instance
-MediatorMemory="-Xmx256m -Xms128m"
 
 ```
 * HostIP... is the IPAddress of the mediator server which is used to register the mediators on the OpenDaylight-Server
@@ -117,7 +97,7 @@ MediatorDeviceTypes:
 | Value | enumValue | Name |
 | --- | --- | --- |
 | 0 | DEVICETYPE_SIMULATOR | "Simulator" |
-| 1 | DEVICETYPE_EXAMPLE_DEVICE | "Example Device" |
+
 
 
 MediatorConfig class:
@@ -140,5 +120,6 @@ MediatorConfig class:
 
 ### TODO
 
+* include Log4J or sth like this
 * read mediators logs
 * implement getperformance task

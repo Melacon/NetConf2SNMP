@@ -21,8 +21,11 @@ public class UserCommand extends RPCElement {
 
     private final String command;
 
+	private static int idCounter=0;
+
     public UserCommand( String command ) {
         this.command = command;
+        this.setMessageId("UserCommand_"+(idCounter++));
     }
 
     public String getCommand() {

@@ -11,15 +11,18 @@
   <div class="row">
     <div class="col-md-3"><span>DeviceType:</div>
     <div class="col-md-9">
-    	<select class="form-control" ng-model="mediator.devicetype" >
-    		<option ng-repeat="option in options.nedevicetype" value="{{option.Value}}">{{option.Name}}</option>
+    	<select class="form-control" ng-model="mediator.devicetype" ng-change="devicechange()">
+    		<option ng-repeat="option in options.nedevicetype" value="{{option.Id}}">{{option.GetFullName()}}</option>
     	</select>
     </div>
   </div>
   <div class="row">
     <div class="col-md-3"><span>IP address:</div>
     <div class="col-md-9">
-    	<input type="text" ng-model="mediator.remoteip" class="form-control"/>
+    	<input type="text" ng-model="mediator.remoteip" class="form-control" style="display:inline-block;width:70%;"/>
+    	<span>&nbsp;:&nbsp;</span>
+    	<input type="text" ng-model="mediator.remoteport" class="form-control" style="display:inline-block;width:25%;float:right;"/>
+
     </div>
   </div>
   <div class="row">
@@ -34,13 +37,48 @@
     <input type="number" class="form-control" ng-model="mediator.ncport" />
     </div>
   </div>
-  <div class="row">
+  <div class="row" ng-show="{{options.shownemodels}}">
     <div class="col-md-3"><span>NeModel:</div>
     <div class="col-md-9">
     	<select class="form-control" ng-model="mediator.nexml">
     		<option ng-repeat="option in options.nexmlmodel" value="{{option}}">{{option}}</option>
     	</select>
     </div>
+  </div>
+  <hr class="row" />
+  <div class="row">
+	<uib-accordion close-others="oneAtATime">
+		<div uib-accordion-group class="panel-default"	is-open="true">
+		<uib-accordion-heading>
+		    <i class="pull-left fa" ng-class="{'fa-chevron-down': true, 'fa-chevron-right': false}"></i>
+		    <span>{{'ODL Connection Config' | translate}}</span>
+		</uib-accordion-heading>
+		<div class="" style="position:relative;">
+			<button class="btn btn-default" ng-click="odledit()" style="position:absolute;top:1rem;right:1rem;"><i class="fa fa-edit"></i></button>
+			<div class="row">
+				<div class="col-md-3"><span >Hostname:</span></div>
+				<div class="col-md-6"><input ng-disabled="!odlsavebtn.enabled" class="form-control" type="text" ng-model="odlconfig.Server" /></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3"><span >Port:</span></div>
+				<div class="col-md-6"><input ng-disabled="!odlsavebtn.enabled" class="form-control" type="text" ng-model="odlconfig.Port" /></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3"><span >Username:</span></div>
+				<div class="col-md-6"><input ng-disabled="!odlsavebtn.enabled" class="form-control" type="text" ng-model="odlconfig.User" /></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3"><span >Password:</span></div>
+				<div class="col-md-6"><input ng-disabled="!odlsavebtn.enabled" class="form-control" type="text" ng-model="odlconfig.Password" /></div>
+			</div>
+			<div class="row">
+				<div class="col-md-3"></div>
+				<div class="col-md-6"><button class="btn btn-default" ng-click="odlsave()" ng-disabled="!odlsavebtn.enabled">Save</button></div>
+			</div>
+
+		</div>
+</div>
+	</uib-accordion>
   </div>
   <div class="row">
   	<div class="col-md-12">

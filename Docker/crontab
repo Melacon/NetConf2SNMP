@@ -1,0 +1,6 @@
+*/2 * * * * /bin/bash /opt/snmp/bin/firewall.sh >> /var/log/firewall.log
+*/2 * * * * /bin/bash /opt/snmp/bin/clean_all.sh > /dev/null 2>&1
+0 */24 * * * cp /var/log/firewall.log /var/log/firewall.log.1 && > /var/log/firewall.log
+0 */24 * * * cp /var/log/mediatorserver.log /var/log/mediatorserver.log.1 && > /var/log/mediatorserver.log
+
+
