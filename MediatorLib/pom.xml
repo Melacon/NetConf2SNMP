@@ -1,4 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.technologies.highstreet</groupId>
@@ -9,14 +10,6 @@
 		<java.version>1.8</java.version>
 		<!-- dependencies versions -->
 		<netconf4j.version>0.0.9b</netconf4j.version>
-		<pax-logging.version>1.6.10</pax-logging.version>
-		<commons-io.version>1.4</commons-io.version>
-		<sshd.version>1.7.0</sshd.version>
-		<junit.version>4.10</junit.version>
-		<guava.version>17.0</guava.version>
-		<maven.compiler.source>1.8</maven.compiler.source>
-   		<maven.compiler.target>1.8</maven.compiler.target>
-		
 	</properties>
 	<dependencies>
 		<dependency>
@@ -40,11 +33,24 @@
 			<version>20170516</version>
 		</dependency>
 		<dependency>
-            <groupId>org.snmp4j</groupId>
-            <artifactId>snmp4j</artifactId>
-            <version>2.6.2</version>
-        </dependency>
+			<groupId>org.snmp4j</groupId>
+			<artifactId>snmp4j</artifactId>
+			<version>2.6.2</version>
+		</dependency>
 	</dependencies>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.1</version>
+				<configuration>
+					<source>${java.version}</source>
+					<target>${java.version}</target>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
 	<repositories>
 		<repository>
 			<id>repo</id>
