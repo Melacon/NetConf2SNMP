@@ -193,6 +193,8 @@ public class TaskServlet extends HttpServlet {
 		String bin="java -jar "+MediatorCoreFiles.MEDIATOR_JAR();
 		try {
 			devicesJSON=executeInForeground(bin+" --devices").trim();
+			if(devicesJSON==null || devicesJSON.trim()=="")
+				devicesJSON="[]";
 		}
 		catch (IOException e) {
 			LOG.error(e.getMessage());

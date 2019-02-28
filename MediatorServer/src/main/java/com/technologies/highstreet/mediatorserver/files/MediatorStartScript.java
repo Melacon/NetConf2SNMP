@@ -93,11 +93,13 @@ public class MediatorStartScript {
 		bw.close();
 		file2.setExecutable(true);
 		//write login.xml
-		bw = new BufferedWriter(new FileWriter(filenameLoginXML));
-		bw.write(odlLoginScript(cfg));
-		bw.flush();
-		bw.close();
-
+		if(cfg.hasODLConfig())
+		{
+			bw = new BufferedWriter(new FileWriter(filenameLoginXML));
+			bw.write(odlLoginScript(cfg));
+			bw.flush();
+			bw.close();
+		}
 
 	}
 

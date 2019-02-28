@@ -347,6 +347,9 @@ public class ServerSideMediatorConfig extends MediatorConfig implements IJSONabl
 			this.mNeXMLFilename=this.mNeXMLFilename.substring(1);
 		this.mNeXMLFilename=nemodelpath+this.mNeXMLFilename;
 	}
+	public boolean hasODLConfig() {
+		return this.getFirstODLConfig()!=null;
+	}
 
 
 
