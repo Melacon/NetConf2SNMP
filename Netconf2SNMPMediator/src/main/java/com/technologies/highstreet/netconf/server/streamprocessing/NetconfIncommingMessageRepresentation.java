@@ -60,15 +60,18 @@ public class NetconfIncommingMessageRepresentation extends RPCElement {
 
     public void addCollectionValue(int level, String value ) {
 
+        value = value.trim();
         if (! (value.isEmpty() || value.equals("\n"))) {
-            //Method 1
+            //used to manage list access
+            //Method 1 add the value
             tags.addTagsValue(value);
 
-            //Method 2
+            //Method 2 add the key and value
             String res = tags.getTagsPath();
             String key = res;
             int idx=1;
             while ( content.containsKey(key) ) {
+            	//Generate a new unique key .. that is not in the content
                 key = res + "." + String.valueOf(idx++);
             }
             content.put(key, value);
